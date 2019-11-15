@@ -1,0 +1,2536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+<div class="blog-content-box">
+    <div class="article-header-box">
+        <div class="article-header">
+            <div class="article-title-box">
+                <span class="article-type type-1 float-left">原创</span>                <h1 class="title-article">JVM初探 -JVM内存模型</h1>
+            </div>
+            <div class="article-info-box">
+                <div class="article-bar-top" style="height: 24px;">
+                    <span class="c-gray">置顶</span>
+                    <span class="time">2016-12-02 18:47:48</span>
+                    <a class="follow-nickName" href="https://me.csdn.net/hanqing280441589" target="_blank" rel="noopener">菜鸟-翡青</a>
+                    <span class="read-count">阅读数 40567</span><span class="article_info_click" style="position: static;">更多</span>
+                    <div class="tags-box space">
+                        <span class="label">分类专栏：</span>
+                        <a class="tag-link" target="_blank" rel="noopener" href="https://blog.csdn.net/hanqing280441589/article/category/6584708">
+                            jvm                                        </a>
+                        <a class="tag-link" target="_blank" rel="noopener" href="https://blog.csdn.net/hanqing280441589/article/category/9267610">
+                            Java研发进阶之路                                        </a>
+                    </div>
+                </div>
+                <div class="operating">
+                </div>
+            </div>
+        </div>
+    </div>
+    <article class="baidu_pl">
+        <div id="article_content" class="article_content clearfix">
+            <div class="article-copyright">
+                <span class="creativecommons">
+                <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">
+                    </a>
+            <span>
+                版权声明：本文为博主原创文章，遵循<a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener"> CC 4.0 BY-SA </a>版权协议，转载请附上原文出处链接和本声明。            </span>
+               <div class="article-source-link2222">
+                    本文链接：<a href="https://blog.csdn.net/hanqing280441589/article/details/53437703">https://blog.csdn.net/hanqing280441589/article/details/53437703</a>
+                </div>
+            </span>
+            </div>
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-3019150162.css">
+            <div id="content_views" class="markdown_views">
+                <!-- flowchart 箭头图标 勿删 -->
+                <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                    <path stroke-linecap="round" d="M5,0 0,2.5 5,5z" id="raphael-marker-block" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></path>
+                </svg>
+                <h1 id="jvm初探-jvm内存模型"><a name="t0"></a>JVM初探 -JVM内存模型</h1>
+
+                <p>标签 ： JVM</p>
+
+                <hr>
+
+                <blockquote>
+                    <p>JVM是每个Java开发每天都会接触到的东西, 其相关知识也应该是每个人都要深入了解的. 但接触了很多人发现: 或了解片面或知识体系陈旧. 因此最近抽时间研读了几本评价较高的JVM入门书籍, 算是总结于此. 本系列博客的主体来自 <strong><em>深入理解Java虚拟机(第二版)</em></strong> 和 <strong><em>实战Java虚拟机</em></strong> 两部书, 部分内容参考 <strong>HotSpot实战</strong> 和 <strong>深入理解计算机系统</strong> 以及网上大量的文章. 若文内有引文未注明出处的, 还请联系作者修改.</p>
+                </blockquote>
+
+                <hr>
+
+                <p><img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-10-16/6495951.jpg" alt="" title=""> <br>
+                    JVM 虚拟机架构(图片来源: <a href="http://blog.hesey.net/2011/04/introduction-to-java-virtual-machine.html" rel="nofollow" data-token="1b2d6e476afc257afe51de8b72ce1cf7">浅析Java虚拟机结构与机制</a>)</p>
+
+                <hr>
+
+                <h2 id="jvm-内存区域"><a name="t1"></a>JVM 内存区域</h2>
+
+                <p>JVM会将Java进程所管理的内存划分为若干不同的数据区域. 这些区域有各自的用途、创建/销毁时间:</p>
+
+                <p><img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-10-18/10813208.jpg" alt="" title=""> <br>
+                    (图片来源: <a href="http://ifeve.com/under-the-hood-runtime-data-areas-javas-memory-model/" rel="nofollow" data-token="469187f69b866d0008eaa0866ce5c710">JAVA的内存模型及结构</a>)</p>
+
+                <hr>
+
+
+
+                <h3 id="一-线程私有区域"><a name="t2"></a>一. 线程私有区域</h3>
+
+                <blockquote>
+                    <p>线程私有数据区域生命周期与线程相同, 依赖用户线程的启动/结束而创建/销毁(在Hotspot VM内, 每个线程都与操作系统的本地线程直接映射, 因此这部分内存区域的存/否跟随本地线程的生/死).</p>
+                </blockquote>
+
+
+
+                <h4 id="1-program-counter-register程序计数器">1. Program Counter Register(程序计数器):</h4>
+
+                <p>一块较小的内存空间, 作用是<strong>当前线程所执行字节码的行号指示器</strong>(类似于传统CPU模型中的PC), PC在每次指令执行后自增, 维护下一个将要执行指令的地址. 在JVM模型中, 字节码解释器就是通过改变PC值来选取下一条需要执行的字节码指令,分支、循环、跳转、异常处理、线程恢复等基础功能都需要依赖PC完成(仅限于Java方法, Native方法该计数器值为<code>undefined</code>). <br>
+                    不同于OS以进程为单位调度, JVM中的并发是通过<strong>线程切换并分配时间片执行</strong>来实现的. 在任何一个时刻, 一个处理器内核只会执行一条线程中的指令. 因此, 为了线程切换后能恢复到正确的执行位置, 每条线程都需要有一个独立的程序计数器, 这类内存被称为<strong>“线程私有”内存</strong>.</p>
+
+                <hr>
+
+
+
+                <h4 id="2-java-stack虚拟机栈">2. Java Stack(虚拟机栈)</h4>
+
+                <p>虚拟机栈描述的是<strong>Java方法执行的内存模型</strong>: 每个方法被执行时会创建一个<strong>栈帧(Stack Frame)</strong>用于存储<strong>局部变量表</strong>、<strong>操作数栈</strong>、<strong>动态链接</strong>、<strong>方法出口</strong>等信息. 每个方法被调用至返回的过程, 就对应着一个栈帧在虚拟机栈中<strong>从入栈到出栈的过程</strong>(VM提供了<code>-Xss</code>来指定线程的最大栈空间, 该参数也直接决定了函数调用的最大深度). </p>
+
+                <ul>
+                    <li><strong>局部变量表</strong>(对应我们常说的<strong><em>‘堆栈’</em></strong>中的<strong><em>‘栈’</em></strong>)存放了<strong>编译期可知</strong>的各种<strong><em>基本数据类型</em></strong>(如boolean、int、double等) 、<strong><em>对象引用</em></strong>(reference : 不等同于对象本身, 可能是一个指向对象起始地址的指针, 也可能指向一个代表对象的句柄或其他与此对象相关的位置, 见下: HotSpot对象定位方式) 和 <strong><em>returnAddress类型</em></strong>(指向一条字节码指令的地址). 其中<code>long</code>和<code>double</code>占用2个局部变量空间(Slot), 其余只占用1个. 如下Java方法代码可以使用javap命令或javassist等字节码工具读到:</li>
+                </ul>
+
+
+
+                <pre class="prettyprint" name="code"><code class="hljs lasso has-numbering" onclick="mdcp.copyCode(event)" style="position: unset;"><span class="hljs-keyword">public</span> <span class="hljs-built_in">String</span> test(int a, long b, float c, double d, <span class="hljs-built_in">Date</span> <span class="hljs-built_in">date</span>, <span class="hljs-built_in">List</span><span class="hljs-subst">&lt;</span><span class="hljs-built_in">String</span><span class="hljs-subst">&gt;</span> <span class="hljs-built_in">list</span>) {
+    StringBuilder sb <span class="hljs-subst">=</span> <span class="hljs-literal">new</span> StringBuilder()<span class="hljs-built_in">.</span>append(a)<span class="hljs-built_in">.</span>append(b)<span class="hljs-built_in">.</span>append(c)<span class="hljs-built_in">.</span>append(d)<span class="hljs-built_in">.</span>append(<span class="hljs-built_in">date</span>);
+
+    for (<span class="hljs-built_in">String</span> str : <span class="hljs-built_in">list</span>) {
+        sb<span class="hljs-built_in">.</span>append(str);
+    }
+
+    <span class="hljs-keyword">return</span> sb<span class="hljs-built_in">.</span>toString();
+}<div class="hljs-button {2}" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li></ul></pre>
+
+                <p><img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-11-2/18216385.jpg" alt="" title=""></p>
+
+                <blockquote>
+                    <p>注: javap/javassist读到的其实是静态数据, 而局部变量表内存储的却是运行时动态加载的动态数据, 但因为<strong>局部变量表所需的内存空间在编译期间即可完成分配</strong>, 当进入一个方法时, 这个方法需要在帧中分配多大的局部变量空间是完全确定的,在方法运行期间大小不会改变, 因此可以在概念上认定这两部分内容存储的数据格式相同.</p>
+                </blockquote>
+
+                <hr>
+
+
+
+                <h4 id="3-native-method-stack本地方法栈">3. Native Method Stack(本地方法栈)</h4>
+
+                <p>与<strong>Java Stack作用类似</strong>, 区别是Java Stack为执行Java方法服务, 而<strong>本地方法栈则为Native方法服务</strong>, 如果一个VM实现使用C-linkage模型来支持Native调用, 那么该栈将会是一个C栈(详见: <a href="http://denverj.iteye.com/blog/1220969" rel="nofollow" data-token="739fd58267e9273ad84db851fa9e1df9">JVM学习笔记-本地方法栈(Native Method Stacks)</a>), 但HotSpot VM直接就把本地方法栈和虚拟机栈合二为一.</p>
+
+                <hr>
+
+
+
+                <h3 id="二-线程共享区域"><a name="t3"></a>二. 线程共享区域</h3>
+
+                <p>随虚拟机的启动/关闭而创建/销毁.</p>
+
+                <hr>
+
+
+
+                <h4 id="1-heapjava堆">1. Heap(Java堆)</h4>
+
+                <p>几乎所有对象实例和数组都要在堆上分配(栈上分配、标量替换除外), 因此是VM管理的最大一块内存, 也是垃圾收集器的主要活动区域. 由于现代VM采用<strong>分代收集算法</strong>, 因此Java堆从GC的角度还可以细分为: <strong>新生代</strong>(<em>Eden区</em>、<em>From Survivor区</em>和<em>To Survivor区</em>)和<strong>老年代</strong>;  而从内存分配的角度来看, 线程共享的Java堆还还可以划分出<strong>多个线程私有的分配缓冲区(TLAB)</strong>. 而进一步划分的目的是为了更好地回收内存和更快地分配内存.</p>
+
+                <hr>
+
+
+
+                <h4 id="2-method-area方法区">2. Method Area(方法区)</h4>
+
+                <p>即我们常说的<strong>永久代(Permanent Generation)</strong>, 用于存储<strong>被JVM加载的类信息</strong>、<strong>常量</strong>、<strong>静态变量</strong>、<strong>即时编译器编译后的代码</strong>等数据. HotSpot VM把GC分代收集扩展至方法区, 即<strong>使用Java堆的永久代来实现方法区</strong>, 这样HotSpot的垃圾收集器就可以像管理Java堆一样管理这部分内存, 而不必为方法区开发专门的内存管理器(永久带的内存回收的主要目标是针对<strong>常量池的回收</strong>和<strong>类型的卸载</strong>, 因此收益一般很小)</p>
+
+                <blockquote>
+                    <p>不过在1.7的HotSpot已经将原本放在永久代的字符串常量池移出: <br>
+                        <img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-10-18/33846098.jpg" alt="" title=""> <br>
+                        而在1.8中, 永久区已经被彻底移除, 取而代之的是元数据区<strong>Metaspace</strong>(这一点在查看GC日志和使用<strong>jstat -gcutil</strong>查看GC情况时可以观察到),与永久代不同, 如果不指定Metaspace大小, 如果方法区持续增长, VM会默认耗尽所有系统内存.</p>
+                </blockquote>
+
+                <ul>
+                    <li>运行时常量池 <br>
+                        方法区的一部分. Class文件中除了有类的版本、字段、方法、接口等描述信息外,还有一项<strong>常量池(Constant Pool Table)用于存放编译期生成的各种字面量和符号引用</strong>, 这部分内容会存放到方法区的运行时常量池中(如前面从<code>test</code>方法中读到的<code>signature</code>信息). 但Java语言并不要求常量一定只能在编译期产生, 即并非预置入Class文件中常量池的内容才能进入方法区运行时常量池, 运行期间也可能将新的常量放入池中, 如<code>String</code>的<code>intern()</code>方法.</li>
+                </ul>
+
+                <hr>
+
+
+
+                <h3 id="三-直接内存"><a name="t4"></a>三. 直接内存</h3>
+
+                <p>直接内存并不是JVM运行时数据区的一部分, 但也会被频繁的使用: 在JDK 1.4引入的NIO提供了基于Channel与Buffer的IO方式, 它可以使用Native函数库直接分配<strong>堆外内存</strong>, 然后使用<code>DirectByteBuffer</code>对象作为这块内存的引用进行操作(详见: <a href="http://blog.csdn.net/zjf280441589/article/details/50526810" rel="nofollow" data-token="149c4aac482667b43639c87f83a4e774">Java I/O 扩展</a>), 这样就避免了在Java堆和Native堆中来回复制数据, 因此在一些场景中可以显著提高性能. <br>
+                    显然, 本机直接内存的分配不会受到Java堆大小的限制(即不会遵守-Xms、-Xmx等设置), 但既然是内存, 则肯定还是会受到本机总内存大小及处理器寻址空间的限制, 因此动态扩展时也会出现<code>OutOfMemoryError</code>异常.</p>
+
+                <hr>
+
+
+
+                <h2 id="hotspot对象"><a name="t5"></a>HotSpot对象</h2>
+
+
+
+                <h3 id="对象新建"><a name="t6"></a>对象新建</h3>
+
+                <ul>
+                    <li><p><code>new</code>一个Java Object(包括数组和Class对象), 在JVM会发生如下步骤:</p>
+
+                        <ol><li>VM遇到<code>new</code>指令: 首先去检查该指令的参数是否能在常量池中定位到一个类的符号引用, 并检查这个符号引用代表的类是否已被加载、解析和初始化过. 如果没有, 必须先执行相应的类加载过程.</li>
+                            <li>类加载检查通过后: VM将为新生对象分配内存(对象所需内存的大小在类加载完成后便可完全确定), VM采用<strong>指针碰撞</strong>(内存规整: Serial、ParNew等有内存压缩整理功能的收集器)或<strong>空闲链表</strong>(内存不规整: CMS这种基于Mark-Sweep算法的收集器)方式将一块确定大小的内存从Java堆中划分出来.</li>
+                            <li>除了考虑如何划分可用空间外, 由于在VM上创建对象的行为非常频繁, 因此需要考虑内存分配的并发问题. 解决方案有两个: <br>
+                                <ul><li><strong>对分配内存空间的动作进行同步</strong> -采用 <em>CAS配上失败重试</em> 方式保证更新操作的原子性;</li>
+                                    <li><strong>把内存分配的动作按照线程划分在不同的空间之中进行</strong> -<em>每个线程在Java堆中预先分配一小块内存, 称为本地线程分配缓冲TLAB, 各线程首先在TLAB上分配, 只有TLAB用完, 分配新的TLAB时才需要同步锁定</em>(使用<code>-XX:+/-UseTLAB</code>参数设定).</li></ul></li>
+                            <li>接下来将分配到的内存空间初始化为零值(不包括对象头, 且如果使用TLAB这一个工作也可以提前至TLAB分配时进行). 这一步保证了对象的实例字段可以不赋初始值就直接使用(访问到这些字段的数据类型所对应的零值).</li>
+                            <li>然后要对对象进行必要的设置: 如<em>该对象所属的类实例</em>、<em>如何能访问到类的元数据信息</em>、<em>对象的哈希码</em>、<em>对象的GC分代年龄</em>等,  这部分息放在对象头中(详见下).</li>
+                            <li>上面工作都完成之后, 在虚拟机角度一个新对象已经产生, 但在Java视角对象的创建才刚刚开始(<code>&lt;init&gt;</code>方法尚未执行, 所有字段还都为零). 所以<code>new</code>指令之后一般会(由字节码中是否跟随有<code>invokespecial</code>指令所决定-Interface一般不会有, 而Class一般会有)接着执行<code>&lt;init&gt;</code>方法, 把对象按照程序员的意愿进行初始化, 这样一个真正可用的对象才算完全产生出来.</li></ol></li>
+                </ul>
+
+                <hr>
+
+
+
+                <h3 id="对象存储布局"><a name="t7"></a>对象存储布局</h3>
+
+                <p>HotSpot VM内, 对象在内存中的存储布局可以分为三块区域：对象头、实例数据和对齐填充:</p>
+
+                <ul>
+                    <li>对象头包括两部分:  <br>
+                        <ul><li>一部分是<strong>类型指针</strong>, 即是对象指向它的类元数据的指针:  VM通过该指针确定该对象属于哪个类实例. 另外, 如果对象是一个数组, 那在对象头中还必须有一块数据用于记录数组长度.  <br>
+
+
+                            <blockquote>
+                                <p>注意: 并非所有VM实现都必须在对象数据上保留类型指针, 也就是说查找对象的元数据并非一定要经过对象本身(详见下面句柄定位对象方式).</p></blockquote></li>
+                            <li>一部分用于存储<strong>对象自身的运行时数据</strong>:  <em>HashCode</em>、<em>GC分代年龄</em>、<em>锁状态标志</em>、<em>线程持有的锁</em>、<em>偏向线程ID</em>、<em>偏向时间戳</em>等, 这部分数据的长度在32位和64位的VM(暂不考虑开启压缩指针)中分别为32bit和64bit, 官方称之为<strong>“Mark Word”</strong>; 其存储格式如下:</li></ul></li>
+                </ul>
+
+                <div class="table-box"><table>
+                    <thead>
+                    <tr>
+                        <th align="center">状态</th>
+                        <th align="center">标志位</th>
+                        <th align="left">存储内容</th>
+                    </tr>
+                    </thead>
+                    <tbody><tr>
+                        <td align="center">未锁定</td>
+                        <td align="center">01</td>
+                        <td align="left">对象哈希码、对象分代年龄</td>
+                    </tr>
+                    <tr>
+                        <td align="center">轻量级锁定</td>
+                        <td align="center">00</td>
+                        <td align="left">指向锁记录的指针</td>
+                    </tr>
+                    <tr>
+                        <td align="center">膨胀(重量级锁定)</td>
+                        <td align="center">10</td>
+                        <td align="left">执行重量级锁定的指针</td>
+                    </tr>
+                    <tr>
+                        <td align="center">GC标记</td>
+                        <td align="center">11</td>
+                        <td align="left">空(不需要记录信息)</td>
+                    </tr>
+                    <tr>
+                        <td align="center">可偏向</td>
+                        <td align="center">01</td>
+                        <td align="left">偏向线程ID、偏向时间戳、对象分代年龄</td>
+                    </tr>
+                    </tbody></table></div>
+
+
+
+                <ul>
+                    <li>实例数据部分是对象<strong>真正存储的有效信息</strong>, 也就是我们在代码里所定义的各种类型的字段内容(无论是从父类继承下来的, 还是在子类中定义的都需要记录下来). 这部分的存储顺序会受到虚拟机分配策略参数和字段在Java源码中定义顺序的影响. HotSpot默认的分配策略为<code>longs</code>/<code>doubles</code>、<code>ints</code>、<code>shorts</code>/<code>chars</code>、<code>bytes</code>/<code>booleans</code>、<code>oops</code>(Ordinary Object Pointers), <strong>相同宽度的字段总是被分配到一起</strong>, 在满足这个前提条件下, 在父类中定义的变量会出现在子类之前. 如果<code>CompactFields</code>参数值为<code>true</code>(默认), 那<strong>子类中较窄的变量也可能会插入到父类变量的空隙中</strong>.</li>
+                    <li>对齐填充部分并不是必然存在的, 仅起到占位符的作用, 原因是HotSpot自动内存管理系统要求对象起始地址必须是8字节的整数倍, 即<strong>对象的大小必须是8字节的整数倍</strong>.</li>
+                </ul>
+
+                <hr>
+
+
+
+                <h3 id="对象定位"><a name="t8"></a>对象定位</h3>
+
+                <p>建立对象是为了使用对象, Java程序需要通过栈上的reference来操作堆上的具体对象. 主流的有<strong>句柄</strong>和<strong>直接指针</strong>两种方式去定位和访问堆上的对象:</p>
+
+                <ul>
+                    <li><p>句柄: Java堆中将会划分出一块内存来作为句柄池, reference中存储对象的句柄地址, 而句柄中包含了对象实例数据与类型数据的具体各自的地址信息: <br>
+                        <img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-10-19/94175572.jpg" alt="" title=""></p></li>
+                    <li><p>直接指针(HotSpot使用): 该方式Java堆对象的布局中就必须考虑如何放置访问类型数据的相关信息, reference中存储的直接就是对象地址: <br>
+                        <img src="http://7xrgh9.com1.z0.glb.clouddn.com/16-10-19/31427095.jpg" alt="" title=""></p></li>
+                </ul>
+
+                <p>这两种对象访问方式各有优势: 使用句柄来访问的最大好处是reference中存储的是稳定句柄地址, 在对象被移动(垃圾收集时移动对象是非常普遍的行为)时只会改变句柄中的实例数据指针,而reference本身不变. 而使用直接指针最大的好处就是速度更快, 它节省了一次指针定位的时间开销,由于对象访问非常频繁, 因此这类开销积小成多也是一项非常可观的执行成本.</p>
+
+                <hr>
+
+                <dl>
+                    <dt>参考 &amp; 拓展</dt>
+                    <dd><a href="https://book.douban.com/subject/24722612/" rel="nofollow" data-token="655db5127594cad6645b4c200655dd0c">深入理解Java虚拟机</a></dd>
+
+                    <dd><a href="https://book.douban.com/subject/26354292/" rel="nofollow" data-token="b0e0c2e9a44506aaec797b84e4cc7355">实战Java虚拟机</a></dd>
+
+                    <dd><a href="https://book.douban.com/subject/25847620/" rel="nofollow" data-token="2cc4035fe9291571577f46b5dd221460">HotSpot实战</a></dd>
+
+                    <dd><a href="https://book.douban.com/subject/5333562/" rel="nofollow" data-token="7c75b68392ad76a1671faf2782f4ecfa">深入理解计算机系统</a></dd>
+
+                    <dd><a href="http://www.importnew.com/17770.html" rel="nofollow" data-token="3796430111f799159843dc788d1a23ba">JVM内幕：Java虚拟机详解</a> (荐)</dd>
+
+                    <dd><a href="http://www.cnblogs.com/gw811/archive/2012/10/18/2730117.html" rel="nofollow" data-token="4411668ce0998737c1931c16f793d907">Java内存管理：深入Java内存区域</a></dd>
+
+                    <dd><a href="http://ifeve.com/under-the-hood-runtime-data-areas-javas-memory-model/" rel="nofollow" data-token="469187f69b866d0008eaa0866ce5c710">JAVA的内存模型及结构</a></dd>
+
+                    <dd><a href="http://www.oracle.com/technetwork/java/javase/memorymanagement-whitepaper-150215.pdf" rel="nofollow" data-token="711bb72e59ba885bcfa0dffc35b8abe2">Memory Management in the Java HotSpot Virtual Machine</a></dd>
+
+                    <dd><a href="http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html" rel="nofollow" data-token="187252ff48060b0f68b56247197a49f2">Java HotSpot VM Options</a></dd>
+
+                    <dd><a href="http://ifeve.com/useful-jvm-flags-part-1-jvm-types-and-compiler-modes-2/" rel="nofollow" data-token="b44cf0fe884acc91d1abfecd5cc726ec">JVM实用参数（一）JVM类型以及编译器模式</a></dd>
+
+                    <dd><a href="http://www.infoq.com/cn/articles/jvm-hotspot/" rel="nofollow" data-token="8bdffe2a023749e34e2ae505a036298c">HotSpot虚拟机对象探秘</a></dd>
+                </dl>
+
+                <hr>
+
+                <ul>
+                    <li><em>by</em> 翡青 <br>
+                        <ul><li>博客: <a href="http://blog.csdn.net/zjf280441589" rel="nofollow" data-token="e4be41a0042715e70472ddaa43e3fb85">翡青的技术周刊</a> - <a href="http://blog.csdn.net/zjf280441589" rel="nofollow" data-token="e4be41a0042715e70472ddaa43e3fb85">http://blog.csdn.net/zjf280441589</a></li>
+                            <li>微博: <a href="http://weibo.com/u/3319050953" rel="nofollow" data-token="7a238167a9a7ad9868e7d0d64f562249">翡青jf</a> - <a href="http://weibo.com/u/3319050953" rel="nofollow" data-token="7a238167a9a7ad9868e7d0d64f562249">http://weibo.com/u/3319050953</a></li></ul></li>
+                </ul>                                    </div>
+            <link href="https://csdnimg.cn/release/phoenix/mdeditor/markdown_views-e9f16cbbc2.css" rel="stylesheet">
+        </div>
+    </article>
+    <div class="postTime">
+        <div class="article-bar-bottom">
+            <span class="time">
+                文章最后发布于: 2016-12-02 18:47:48            </span>
+        </div>
+    </div>
+</div>
+
+
+<!--打赏开始-->
+<div class="reward-user-box" style="margin-top: -12px;">
+    <span class="reward-word" style="color:#B4B4B4 !important">有 <span class="num">0</span> 个人打赏</span>
+</div>
+<!--打赏结束-->
+<div class="recommend-box"><div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/Luomingkui1109/article/details/72820232&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;0&quot;}">
+    <div class="content" style="width: 962px;">
+        <a href="https://blog.csdn.net/Luomingkui1109/article/details/72820232" target="_blank" rel="noopener" title="JVM运行原理详解">
+            <h4 class="text-truncate oneline" style="width: 802px;">
+                <em>JVM</em>运行原理详解		</h4>
+            <div class="info-box d-flex align-content-center">
+                <p class="date-and-readNum oneline">
+                    <span class="date hover-show">05-31</span>
+                    <span class="read-num hover-hide">
+					阅读数
+					9万+</span>
+                </p>
+            </div>
+        </a>
+        <p class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/Luomingkui1109/article/details/72820232" target="_blank" rel="noopener" title="JVM运行原理详解">
+                <span class="desc oneline">1.JVM简析：作为一名Java使用者，掌握JVM的体系结构也是很有必要的。说起Java，我们首先想到的是Java编程语言，然而事实上，Java是一种技术，它由四方面组成：Java编程语言、Java类...</span>
+            </a>
+            <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/Luomingkui1109">来自：	<span class="blog_title"> 似梦似意境</span></a>
+												</span>
+        </p>
+    </div>
+</div>
+
+
+
+</div>
+<a id="commentBox"></a>
+<div class="comment-box">
+    <div class="comment-edit-box d-flex">
+        <a id="commentsedit"></a>
+        <div class="user-img">
+            <a href="//me.csdn.net/qq_22242915" target="_blank" rel="noopener">
+                <img class="" src="https://avatar.csdn.net/0/2/3/3_qq_22242915.jpg">
+            </a>
+        </div>
+        <form id="commentform">
+            <input type="hidden" id="comment_replyId">
+            <textarea class="comment-content" name="comment_content" id="comment_content" placeholder="想对作者说点什么"></textarea>
+            <div class="opt-box"> <!-- d-flex -->
+                <div id="ubbtools" class="add_code">
+                    <a href="#insertcode" code="code" target="_self"><i class="icon iconfont icon-daima"></i></a>
+                </div>
+                <input type="hidden" id="comment_replyId" name="comment_replyId">
+                <input type="hidden" id="article_id" name="article_id" value="53437703">
+                <input type="hidden" id="comment_userId" name="comment_userId" value="">
+                <input type="hidden" id="commentId" name="commentId" value="">
+                <div style="display: none;" class="csdn-tracking-statistics tracking-click" data-report-click="{&quot;mod&quot;:&quot;popu_384&quot;,&quot;dest&quot;:&quot;&quot;}"><a href="#" target="_blank" class="comment_area_btn" rel="noopener">发表评论</a></div>
+                <div class="dropdown" id="myDrap">
+                    <a class="dropdown-face d-flex align-items-center" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                        <div class="txt-selected text-truncate">添加代码片</div>
+                        <svg class="icon d-block" aria-hidden="true">
+                            <use xlink:href="#csdnc-triangledown"></use>
+                        </svg>
+                    </a>
+                    <ul class="dropdown-menu" id="commentCode" aria-labelledby="drop4">
+                        <li><a data-code="html">HTML/XML</a></li>
+                        <li><a data-code="objc">objective-c</a></li>
+                        <li><a data-code="ruby">Ruby</a></li>
+                        <li><a data-code="php">PHP</a></li>
+                        <li><a data-code="csharp">C</a></li>
+                        <li><a data-code="cpp">C++</a></li>
+                        <li><a data-code="javascript">JavaScript</a></li>
+                        <li><a data-code="python">Python</a></li>
+                        <li><a data-code="java">Java</a></li>
+                        <li><a data-code="css">CSS</a></li>
+                        <li><a data-code="sql">SQL</a></li>
+                        <li><a data-code="plain">其它</a></li>
+                    </ul>
+                </div>
+                <div class="right-box">
+                    <span id="tip_comment" class="tip">还能输入<em>1000</em>个字符</span>
+                    <input type="button" class="btn btn-sm btn-cancel d-none" value="取消回复">
+                    <input type="submit" class="btn btn-sm btn-red btn-comment" value="发表评论">
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="comment-list-container">
+        <a id="comments"></a>
+        <div class="comment-list-box" style="max-height: 231.6px;"><ul class="comment-list"><li class="comment-line-box d-flex" data-commentid="8890314" data-replyname="ma15732625261">      <a target="_blank" href="https://me.csdn.net/ma15732625261"><img src="https://avatar.csdn.net/A/D/8/3_ma15732625261.jpg" username="ma15732625261" alt="ma15732625261" class="avatar"></a>        <div class="right-box ">          <div class="new-info-box clearfix">            <a target="_blank" href="https://me.csdn.net/ma15732625261"><span class="name ">星小丫头辰</span></a><span class="date" title="2018-12-17 18:09:13">10个月前</span><span class="floor-num">#4楼</span><span class="new-comment">学习了</span><span class="new-opt-box"><a class="btn btn-link-blue btn-report" data-type="report">举报</a><a class="btn btn-link-blue btn-reply" data-type="reply">回复</a></span></div><div class="comment-like " data-commentid="8890314"><svg t="1569296798904" class="icon " viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5522" width="200" height="200"><path d="M726.016 906.666667h-348.586667a118.016 118.016 0 0 1-116.992-107.904l-29.013333-362.666667A117.589333 117.589333 0 0 1 348.458667 309.333333H384c126.549333 0 160-104.661333 160-160 0-51.413333 39.296-88.704 93.397333-88.704 36.906667 0 71.68 18.389333 92.928 49.194667 26.88 39.04 43.178667 111.658667 12.714667 199.509333h95.530667a117.418667 117.418667 0 0 1 115.797333 136.106667l-49.28 308.522667a180.608 180.608 0 0 1-179.072 152.704zM348.458667 373.333333l-4.48 0.170667a53.461333 53.461333 0 0 0-48.768 57.472l29.013333 362.666667c2.218667 27.52 25.6 49.024 53.205333 49.024h348.544a116.949333 116.949333 0 0 0 115.925334-98.816l49.322666-308.736a53.418667 53.418667 0 0 0-52.650666-61.781334h-144.085334a32 32 0 0 1-28.458666-46.634666c45.909333-89.130667 28.885333-155.434667 11.562666-180.522667a48.981333 48.981333 0 0 0-40.192-21.504c-6.912 0-29.397333 1.792-29.397333 24.704 0 111.317333-76.928 224-224 224h-35.541333zM170.624 906.666667a32.042667 32.042667 0 0 1-31.872-29.44l-42.666667-533.333334a32.042667 32.042667 0 0 1 29.354667-34.474666c17.066667-1.408 33.024 11.733333 34.432 29.354666l42.666667 533.333334a32.042667 32.042667 0 0 1-31.914667 34.56z" p-id="5523"></path></svg><span></span></div></div></li></ul><ul class="comment-list"><li class="comment-line-box d-flex" data-commentid="7182343" data-replyname="lirenzuo">      <a target="_blank" href="https://me.csdn.net/lirenzuo"><img src="https://avatar.csdn.net/F/0/E/3_lirenzuo.jpg" username="lirenzuo" alt="lirenzuo" class="avatar"></a>        <div class="right-box ">          <div class="new-info-box clearfix">            <a target="_blank" href="https://me.csdn.net/lirenzuo"><span class="name ">匠心零度</span></a><span class="date" title="2017-09-12 16:33:27">2年前</span><span class="floor-num">#3楼</span><span class="new-comment">都是jvm实战，欢迎群主过去瞧瞧：http://blog.csdn.net/column/details/17179.html
+和楼主多交流，我也比较喜欢研究jvm这块。</span><span class="new-opt-box"><a class="btn btn-link-blue btn-report" data-type="report">举报</a><a class="btn btn-link-blue btn-reply" data-type="reply">回复</a></span></div><div class="comment-like " data-commentid="7182343"><svg t="1569296798904" class="icon " viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5522" width="200" height="200"><path d="M726.016 906.666667h-348.586667a118.016 118.016 0 0 1-116.992-107.904l-29.013333-362.666667A117.589333 117.589333 0 0 1 348.458667 309.333333H384c126.549333 0 160-104.661333 160-160 0-51.413333 39.296-88.704 93.397333-88.704 36.906667 0 71.68 18.389333 92.928 49.194667 26.88 39.04 43.178667 111.658667 12.714667 199.509333h95.530667a117.418667 117.418667 0 0 1 115.797333 136.106667l-49.28 308.522667a180.608 180.608 0 0 1-179.072 152.704zM348.458667 373.333333l-4.48 0.170667a53.461333 53.461333 0 0 0-48.768 57.472l29.013333 362.666667c2.218667 27.52 25.6 49.024 53.205333 49.024h348.544a116.949333 116.949333 0 0 0 115.925334-98.816l49.322666-308.736a53.418667 53.418667 0 0 0-52.650666-61.781334h-144.085334a32 32 0 0 1-28.458666-46.634666c45.909333-89.130667 28.885333-155.434667 11.562666-180.522667a48.981333 48.981333 0 0 0-40.192-21.504c-6.912 0-29.397333 1.792-29.397333 24.704 0 111.317333-76.928 224-224 224h-35.541333zM170.624 906.666667a32.042667 32.042667 0 0 1-31.872-29.44l-42.666667-533.333334a32.042667 32.042667 0 0 1 29.354667-34.474666c17.066667-1.408 33.024 11.733333 34.432 29.354666l42.666667 533.333334a32.042667 32.042667 0 0 1-31.914667 34.56z" p-id="5523"></path></svg><span></span></div></div></li></ul><ul class="comment-list"><li class="comment-line-box d-flex" data-commentid="6609954" data-replyname="sz15732624895">      <a target="_blank" href="https://me.csdn.net/sz15732624895"><img src="https://avatar.csdn.net/A/7/5/3_sz15732624895.jpg" username="sz15732624895" alt="sz15732624895" class="avatar"></a>        <div class="right-box ">          <div class="new-info-box clearfix">            <a target="_blank" href="https://me.csdn.net/sz15732624895"><span class="name ">宋喆-Sally</span></a><span class="date" title="2017-02-17 22:29:22">2年前</span><span class="floor-num">#2楼</span><span class="new-comment">值得仔细研究</span><span class="new-opt-box"><a class="btn btn-link-blue btn-report" data-type="report">举报</a><a class="btn btn-link-blue btn-reply" data-type="reply">回复</a></span></div><div class="comment-like " data-commentid="6609954"><svg t="1569296798904" class="icon " viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5522" width="200" height="200"><path d="M726.016 906.666667h-348.586667a118.016 118.016 0 0 1-116.992-107.904l-29.013333-362.666667A117.589333 117.589333 0 0 1 348.458667 309.333333H384c126.549333 0 160-104.661333 160-160 0-51.413333 39.296-88.704 93.397333-88.704 36.906667 0 71.68 18.389333 92.928 49.194667 26.88 39.04 43.178667 111.658667 12.714667 199.509333h95.530667a117.418667 117.418667 0 0 1 115.797333 136.106667l-49.28 308.522667a180.608 180.608 0 0 1-179.072 152.704zM348.458667 373.333333l-4.48 0.170667a53.461333 53.461333 0 0 0-48.768 57.472l29.013333 362.666667c2.218667 27.52 25.6 49.024 53.205333 49.024h348.544a116.949333 116.949333 0 0 0 115.925334-98.816l49.322666-308.736a53.418667 53.418667 0 0 0-52.650666-61.781334h-144.085334a32 32 0 0 1-28.458666-46.634666c45.909333-89.130667 28.885333-155.434667 11.562666-180.522667a48.981333 48.981333 0 0 0-40.192-21.504c-6.912 0-29.397333 1.792-29.397333 24.704 0 111.317333-76.928 224-224 224h-35.541333zM170.624 906.666667a32.042667 32.042667 0 0 1-31.872-29.44l-42.666667-533.333334a32.042667 32.042667 0 0 1 29.354667-34.474666c17.066667-1.408 33.024 11.733333 34.432 29.354666l42.666667 533.333334a32.042667 32.042667 0 0 1-31.914667 34.56z" p-id="5523"></path></svg><span></span></div></div></li></ul><ul class="comment-list"><li class="comment-line-box d-flex" data-commentid="6523557" data-replyname="u012466304">      <a target="_blank" href="https://me.csdn.net/u012466304"><img src="https://avatar.csdn.net/9/0/7/3_u012466304.jpg" username="u012466304" alt="u012466304" class="avatar"></a>        <div class="right-box ">          <div class="new-info-box clearfix">            <a target="_blank" href="https://me.csdn.net/u012466304"><span class="name ">king_eagle2015</span></a><span class="date" title="2016-12-31 16:17:31">2年前</span><span class="floor-num">#1楼</span><span class="new-comment">有关gvm确实要详细研究研究</span><span class="new-opt-box"><a class="btn btn-link-blue btn-report" data-type="report">举报</a><a class="btn btn-link-blue btn-reply" data-type="reply">回复</a></span></div><div class="comment-like " data-commentid="6523557"><svg t="1569296798904" class="icon " viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5522" width="200" height="200"><path d="M726.016 906.666667h-348.586667a118.016 118.016 0 0 1-116.992-107.904l-29.013333-362.666667A117.589333 117.589333 0 0 1 348.458667 309.333333H384c126.549333 0 160-104.661333 160-160 0-51.413333 39.296-88.704 93.397333-88.704 36.906667 0 71.68 18.389333 92.928 49.194667 26.88 39.04 43.178667 111.658667 12.714667 199.509333h95.530667a117.418667 117.418667 0 0 1 115.797333 136.106667l-49.28 308.522667a180.608 180.608 0 0 1-179.072 152.704zM348.458667 373.333333l-4.48 0.170667a53.461333 53.461333 0 0 0-48.768 57.472l29.013333 362.666667c2.218667 27.52 25.6 49.024 53.205333 49.024h348.544a116.949333 116.949333 0 0 0 115.925334-98.816l49.322666-308.736a53.418667 53.418667 0 0 0-52.650666-61.781334h-144.085334a32 32 0 0 1-28.458666-46.634666c45.909333-89.130667 28.885333-155.434667 11.562666-180.522667a48.981333 48.981333 0 0 0-40.192-21.504c-6.912 0-29.397333 1.792-29.397333 24.704 0 111.317333-76.928 224-224 224h-35.541333zM170.624 906.666667a32.042667 32.042667 0 0 1-31.872-29.44l-42.666667-533.333334a32.042667 32.042667 0 0 1 29.354667-34.474666c17.066667-1.408 33.024 11.733333 34.432 29.354666l42.666667 533.333334a32.042667 32.042667 0 0 1-31.914667 34.56z" p-id="5523"></path></svg><span></span></div></div></li></ul></div>
+        <div id="commentPage" class="pagination-box d-none" style="display: block;"><div id="Paging_020236284638711077" class="ui-paging-container"><ul><li class="js-page-first js-page-action ui-pager ui-pager-disabled"></li><li class="js-page-prev js-page-action ui-pager ui-pager-disabled">上一页</li><li data-page="1" class="ui-pager focus">1</li><li class="js-page-next js-page-action ui-pager ui-pager-disabled">下一页</li><li class="js-page-last js-page-action ui-pager ui-pager-disabled"></li></ul></div></div>
+        <div class="opt-box text-center">
+            <div class="btn btn-sm btn-link-blue" id="btnMoreComment"><span>查看 4 条热评</span><svg class="icon open" aria-hidden="true"><use xlink:href="#csdnc-chevrondown"></use></svg></div>
+        </div>
+    </div>
+</div>
+<div class="recommend-box">
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/u012152619/article/details/46968883&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;1&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/u012152619/article/details/46968883" target="_blank" rel="noopener" title="JVM内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em><em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">07-21</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					5万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/u012152619/article/details/46968883" target="_blank" rel="noopener" title="JVM内存模型">
+                    <span class="desc oneline">JVM定义了若干个程序执行期间使用的数据区域。这个区域里的一些数据在JVM启动的时候创建，在JVM退出的时候销毁。而其他的数据依赖于每一个线程，在线程创建时创建，在线程退出时销毁。&nbsp;程序计数器程序计数...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/u012152619">来自：	<span class="blog_title"> 冰河</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_22152261/article/details/79491536&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;2&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_22152261/article/details/79491536" target="_blank" rel="noopener" title="关于JVM内存模型的理解">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    关于<em>JVM</em><em>内存</em><em>模型</em>的理解		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">03-09</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					7420</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_22152261/article/details/79491536" target="_blank" rel="noopener" title="关于JVM内存模型的理解">
+                    <span class="desc oneline">一、概念1、JVM内存模型首先老规矩，祭上一张自己画的内存模型图画的比较简陋，简单介绍一下，整个JVM占用的内存可分为两个大区，分别是线程共享区和线程私有区，线程共享区和JVM同生共死，所有线程均可访...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_22152261">来自：	<span class="blog_title"> 菜头君的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_41701956/article/details/81664921&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;3&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_41701956/article/details/81664921" target="_blank" rel="noopener" title="Java虚拟机（JVM）你只要看这一篇就够了！">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    Java虚拟机（<em>JVM</em>）你只要看这一篇就够了！		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">08-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					9万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_41701956/article/details/81664921" target="_blank" rel="noopener" title="Java虚拟机（JVM）你只要看这一篇就够了！">
+                    <span class="desc oneline">1.Java内存区域与内存溢出异常1.1运行时数据区域根据《Java虚拟机规范(JavaSE7版)》规定，Java虚拟机所管理的内存如下图所示。1.1.1程序计数器内存空间小，线程私有。字节码解释器工...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_41701956">来自：	<span class="blog_title"> Java笔记</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/m0_37524661/article/details/87432999&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;4&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/m0_37524661/article/details/87432999" target="_blank" rel="noopener" title="JVM-内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em>-<em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">02-16</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/m0_37524661/article/details/87432999" target="_blank" rel="noopener" title="JVM-内存模型">
+                    <span class="desc oneline">运行时数据区域程序计数器：线程私有；记录指令执行的位置；这里不会出现OutOfMemoryError	虚拟机栈：线程私有；生命周期和线程一致；存储局部变量表、操作数栈、动态链接、方法出口等信息。(局部...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/m0_37524661">来自：	<span class="blog_title"> 好记性不如烂笔头</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/know9163/article/details/80574488&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;5&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/know9163/article/details/80574488" target="_blank" rel="noopener" title="深入详细讲解JVM原理">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    深入详细讲解<em>JVM</em>原理		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">06-04</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					8253</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/know9163/article/details/80574488" target="_blank" rel="noopener" title="深入详细讲解JVM原理">
+                    <span class="desc oneline">一、JVM体系结构：&nbsp;&nbsp;&nbsp;类装载器ClassLoader：用来装载.class文件&nbsp;&nbsp;&nbsp;执行引擎：执行字节码，或者执行本地方法&nbsp;&nbsp;&nbsp;&nbsp;运行时数据区：方法区、堆、Java栈、程序计数器、本地方法栈JVM...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/know9163">来自：	<span class="blog_title"> lzhpo</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392467571&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;6&quot;}">
+        <a href="https://bbs.csdn.net/topics/392467571" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>jvm</em><em>内存</em><em>模型</em>		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">10-25</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">JVM是我们成为一名架构师必须要掌握的一个知识体系，也是我们和一般只会敲代码的程序员特别能体现差距的地方。而JVM的数据结构基础，也就是它的内存模型，是它入门的第一课。下面我将分成3个方面向大家介绍J</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://edu.csdn.net/course/detail/3580&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;7&quot;}">
+        <a href="https://edu.csdn.net/course/detail/3580" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                Java<em>内存</em><em>模型</em>之<em>JVM</em>进阶		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">12-31</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">-</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392436099&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;8&quot;}">
+        <a href="https://bbs.csdn.net/topics/392436099" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                8G 运行<em>内存</em>，JDK1.8 <em>JVM</em>参数配比调优		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">08-22</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">8G内存，JDK1.8 ，jvm设置的最大内存、初始内存、年轻代内存还有线程的堆栈设置多大合适，有没有比较好的配比公式，求大神解答，急！在线等</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_41987553/article/details/83096823&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;9&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_41987553/article/details/83096823" target="_blank" rel="noopener" title="面试题：你说一下JVM？">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    面试题：你说一下<em>JVM</em>？		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-16</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1068</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_41987553/article/details/83096823" target="_blank" rel="noopener" title="面试题：你说一下JVM？">
+                    <span class="desc oneline">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;JVM就是java虚拟机，JVM内存共分为虚拟机栈、堆、方法区、程序计数器、本地方法栈五个部分。&nbsp;&nbsp;1.类的加载（加载到JVM）&nbsp;class文件通过类加载器加载到内存。&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;类加载全过程...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_41987553">来自：	<span class="blog_title"> weixin_41987553的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/74898095&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;1&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/74898095&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;1&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/74898095&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:0,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/74898095&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:0,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/hanqing280441589/article/details/74898095" target="_blank">              		<h4 class="text-truncate oneline" style="width: 891px;">简洁的Java8 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">7-9</span>                    </p>                  </div>                </a>            	</div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53220313#comments&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;2&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53220313#comments&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;2&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53220313#comments&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:1,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53220313#comments&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:1,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/zjf280441589/article/details/53220313#comments" target="_blank">              		<h4 class="text-truncate oneline" style="width: 884px;">岁月划过生命线(16.02 ~ 10 -提前转正) - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">9-30</span>                    </p>                  </div>                </a>            	</div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/54406665&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;10&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/hanqing280441589/article/details/54406665" target="_blank" rel="noopener" title="JVM初探- 使用堆外内存减少Full GC">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em><em>初探</em>- 使用堆外<em>内存</em>减少Full GC		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">01-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/hanqing280441589/article/details/54406665" target="_blank" rel="noopener" title="JVM初探- 使用堆外内存减少Full GC">
+                    <span class="desc oneline">使用堆外内存减少FullGC-JVM大部分主流互联网企业线上ServerJVM选用了CMS收集器(如Taobao、LinkedIn、Vdian),虽然CMS可与用户线程并发GC以降低STW时间,但它也...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/hanqing280441589">来自：	<span class="blog_title"> 菜鸟-翡青</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+    <div class="recommend-item-box blog-expert-recommend-box" style="display: block;">
+        <div class="d-flex">
+            <div class="blog-expert-recommend">
+                <div class="blog-expert">
+                    <div class="blog-expert-flexbox" data-report-view="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><div class="blog-expert-item"><div class="blog-expert-info-box"><div class="blog-expert-img-box" data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/Luomingkui1109" target="_blank"><img src="https://avatar.csdn.net/B/A/9/3_luomingkui1109.jpg" username="Luomingkui1109" alt="似梦似意境" title="似梦似意境"></a><span data-report-click="{&quot;mod&quot;:&quot;popu_710&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><span class="blog-expert-button-follow btn-red-follow" data-name="Luomingkui1109" data-nick="似梦似意境">关注</span></span></div><div class="info"><span data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/Luomingkui1109" target="_blank"><h5 class="oneline" title="似梦似意境">似梦似意境</h5></a></span>  <p></p><p class="article-num" title="594篇文章"> 594篇文章</p><p class="article-num" title="排名:3000+"> 排名:3000+</p><p></p></div></div></div><div class="blog-expert-item"><div class="blog-expert-info-box"><div class="blog-expert-img-box" data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/u012152619" target="_blank"><img src="https://avatar.csdn.net/0/2/B/3_u012152619.jpg" username="u012152619" alt="冰河winner" title="冰河winner"><svg class="icon" aria-hidden="true"><use xlink:href="#csdnc-blogexpert"></use></svg></a><span data-report-click="{&quot;mod&quot;:&quot;popu_710&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><span class="blog-expert-button-follow btn-red-follow" data-name="u012152619" data-nick="冰河winner">关注</span></span></div><div class="info"><span data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/u012152619" target="_blank"><h5 class="oneline" title="冰河winner">冰河winner</h5></a></span>  <p></p><p class="article-num" title="200篇文章"> 200篇文章</p><p class="article-num" title="排名:1000+"> 排名:1000+</p><p></p></div></div></div><div class="blog-expert-item"><div class="blog-expert-info-box"><div class="blog-expert-img-box" data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/qq_22152261" target="_blank"><img src="https://avatar.csdn.net/B/6/6/3_qq_22152261.jpg" username="qq_22152261" alt="菜头君" title="菜头君"></a><span data-report-click="{&quot;mod&quot;:&quot;popu_710&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><span class="blog-expert-button-follow btn-red-follow" data-name="qq_22152261" data-nick="菜头君">关注</span></span></div><div class="info"><span data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/qq_22152261" target="_blank"><h5 class="oneline" title="菜头君">菜头君</h5></a></span>  <p></p><p class="article-num" title="8篇文章"> 8篇文章</p><p class="article-num" title="排名:千里之外"> 排名:千里之外</p><p></p></div></div></div><div class="blog-expert-item"><div class="blog-expert-info-box"><div class="blog-expert-img-box" data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/qq_41701956" target="_blank"><img src="https://avatar.csdn.net/2/6/D/3_qq_41701956.jpg" username="qq_41701956" alt="Java程序员-张凯" title="Java程序员-张凯"></a><span data-report-click="{&quot;mod&quot;:&quot;popu_710&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><span class="blog-expert-button-follow btn-red-follow" data-name="qq_41701956" data-nick="Java程序员-张凯">关注</span></span></div><div class="info"><span data-report-click="{&quot;mod&quot;:&quot;popu_709&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/53437703&quot;}"><a href="https://blog.csdn.net/qq_41701956" target="_blank"><h5 class="oneline" title="Java程序员-张凯">Java程序员-张凯</h5></a></span>  <p></p><p class="article-num" title="244篇文章"> 244篇文章</p><p class="article-num" title="排名:5000+"> 排名:5000+</p><p></p></div></div></div></div>
+                </div>
+            </div>
+        </div>
+    </div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/53543049&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;3&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/53543049&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;3&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/53543049&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:2,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/53543049&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:2,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/hanqing280441589/article/details/53543049" target="_blank">              		<h4 class="text-truncate oneline" style="width: 876px;">策略模式 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">10-24</span>                    </p>                  </div>                </a>            	</div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/56669806&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;4&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/56669806&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;4&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/56669806&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:3,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/56669806&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:3,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/hanqing280441589/article/details/56669806" target="_blank">              		<h4 class="text-truncate oneline" style="width: 891px;">迭代器模式 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">7-8</span>                    </p>                  </div>                </a>            	</div>
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/u011972171/article/details/80398771&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;11&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/u011972171/article/details/80398771" target="_blank" rel="noopener" title="JVM内存模型总结">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em><em>内存</em><em>模型</em>总结		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">05-21</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/u011972171/article/details/80398771" target="_blank" rel="noopener" title="JVM内存模型总结">
+                    <span class="desc oneline">JVM内存模型：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;从这张图中很直观的看到，程序计数器，虚拟机栈，native栈是线程私有的，堆是线程共有的，现在详细介绍JVM各个区块。&nbsp;1.&nbsp;堆（Heap）&nbsp;&nbsp;&nbsp;&nbsp;是java虚拟机所...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/u011972171">来自：	<span class="blog_title"> u011972171的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_33384065/article/details/80282023&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;12&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_33384065/article/details/80282023" target="_blank" rel="noopener" title="JVM 工作原理和流程">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em> 工作原理和流程		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">05-11</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					4万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_33384065/article/details/80282023" target="_blank" rel="noopener" title="JVM 工作原理和流程">
+                    <span class="desc oneline">转Java详解JVM工作原理和流程&amp;amp;lt;divclass=&amp;quot;article-info-box&amp;quot;&amp;amp;gt;&amp;amp;lt;divclass=&amp;quot;article...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_33384065">来自：	<span class="blog_title"> 白开水挺好喝的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/55509942&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;5&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/55509942&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;5&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/55509942&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:4,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/55509942&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:4,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/hanqing280441589/article/details/55509942" target="_blank">              		<h4 class="text-truncate oneline" style="width: 876px;">备忘录模式 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">10-11</span>                    </p>                  </div>                </a>            	</div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/50491260&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;6&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/50491260&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;6&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/50491260&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:5,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/50491260&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:5,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/hanqing280441589/article/details/50491260" target="_blank">              		<h4 class="text-truncate oneline" style="width: 876px;">桥接模式 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">10-27</span>                    </p>                  </div>                </a>            	</div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_33713350/article/details/89933083&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;13&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_33713350/article/details/89933083" target="_blank" rel="noopener" title="简洁的Java8">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    简洁的Java8		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">07-09</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					11</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_33713350/article/details/89933083" target="_blank" rel="noopener" title="简洁的Java8">
+                    <span class="desc oneline">简洁的Java8Stream标签：Java基础再次回到阿里,感觉变化好大:一是服务资源Docker化,最牛逼的阿里DB团队竟然把DB放到了容器中,还放到了线上环境;二是全集团Java8(记得离开时还是...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_33713350">来自：	<span class="blog_title"> weixin_33713350的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/yjp198713/article/details/78759933&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;14&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/yjp198713/article/details/78759933" target="_blank" rel="noopener" title="JVM(二)Java8内存划分">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em>(二)Java8<em>内存</em>划分		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">12-09</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					9327</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/yjp198713/article/details/78759933" target="_blank" rel="noopener" title="JVM(二)Java8内存划分">
+                    <span class="desc oneline">一、永久代在说java8内存模型之前先说一下永久代的概念。在Java虚拟机(JVM)内部，class文件中包括类的版本、字段、方法、接口等描述信息，还有运行时常量池，用于存放编译器生成的各种字面量和符...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/yjp198713">来自：	<span class="blog_title"> keep_trying的专栏</span></a>
+												</span>
+            </p>
+        </div>
+    </div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/54862696&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;7&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/54862696&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;7&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/54862696&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:6,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/54862696&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:6,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/zjf280441589/article/details/54862696" target="_blank">              		<h4 class="text-truncate oneline" style="width: 884px;">岁月划过生命线(2016 年终总结 -季度之星) - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">9-27</span>                    </p>                  </div>                </a>            	</div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a499477783/article/details/83070266&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;8&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a499477783/article/details/83070266&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;8&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a499477783/article/details/83070266&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:7,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a499477783/article/details/83070266&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:7,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/a499477783/article/details/83070266" target="_blank">              		<h4 class="text-truncate oneline" style="width: 876px;"><em>JVM</em>的<em>内存</em>和GC - 呦 ^v^-, 写Bug呢? - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">10-17</span>                    </p>                  </div>                </a>            	</div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392436552&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;15&quot;}">
+        <a href="https://bbs.csdn.net/topics/392436552" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>jvm</em><em>内存</em>结构<em>模型</em>		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">08-23</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">只为记录学习，有哪里不对，望指正！</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392319021&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;16&quot;}">
+        <a href="https://bbs.csdn.net/topics/392319021" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>jvm</em>参数如何设置，服务器4g<em>内存</em>		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">02-05</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">linux，catalina.sh设置如下： JAVA_OPTS="-server -Xms512m -Xmx512m -XX:PermSize=128m -XX:MaxPermSize=256m -</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/52343557&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;9&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/52343557&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;9&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/52343557&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:8,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/zjf280441589/article/details/52343557&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:8,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/zjf280441589/article/details/52343557" target="_blank">              		<h4 class="text-truncate oneline" style="width: 884px;">装饰者模式 - 菜鸟-翡青 - CSDN博客</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">6-19</span>                    </p>                  </div>                </a>            	</div><div class="recommend-item-box baiduSearch recommend-box-ident" data-report-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xmtblog/article/details/88648097&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;10&quot;}" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xmtblog/article/details/88648097&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:&quot;10&quot;}" data-track-view="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xmtblog/article/details/88648097&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:9,&quot;extend1&quot;:&quot;_&quot;}" data-track-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xmtblog/article/details/88648097&quot;,&quot;strategy&quot;:&quot;searchFromBaidu1&quot;,&quot;index&quot;:9,&quot;extend1&quot;:&quot;_&quot;}" data-flg="true">                <a href="https://blog.csdn.net/xmtblog/article/details/88648097" target="_blank">              		<h4 class="text-truncate oneline" style="width: 884px;">触发<em>JVM</em>进行Full GC的情况及应对策略 - xmt1139057136的专栏 -...</h4>                  <div class="info-box d-flex align-content-center">                    <p>                      <span class="date">3-19</span>                    </p>                  </div>                </a>            	</div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392214343&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;17&quot;}">
+        <a href="https://bbs.csdn.net/topics/392214343" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>JVM</em><em>内存</em><em>模型</em>的相关概念 		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">08-11</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">JVM在执行Java程序时，会把它管理的内存划分为若干个的区域，每个区域都有自己的用途和创建销毁时间。如下图所示，可以分为两大部分，线程私有区和共享区： .线程私有区 程序计数器。当同时进行的线程数超</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392945305&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;18&quot;}">
+        <a href="https://bbs.csdn.net/topics/392945305" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                关于<em>内存</em><em>模型</em>JMM中工作<em>内存</em>的疑问		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">07-26</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">各位大佬，小弟在看了JAVA内存模型JMM后，有个地方不明白：工作内存存放主内存变量的副本，如果是一个好几M的大对象，超过了cpu缓存的大小，放不下，这是怎么处理的？</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_15037231/article/details/80605350&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;19&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_15037231/article/details/80605350" target="_blank" rel="noopener" title="深入理解JVM">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    深入理解<em>JVM</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">06-07</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3384</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_15037231/article/details/80605350" target="_blank" rel="noopener" title="深入理解JVM">
+                    <span class="desc oneline">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Java程序通过编译生成class文件，生成的class文件通过JVM（JavaVirtual&nbsp;Machine）来运行，JVM在执行Java程序的过程中会把它所管理的内存划分为若干个不同的数...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_15037231">来自：	<span class="blog_title"> 斜阳雨陌</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hanqing280441589/article/details/53220313&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;20&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/hanqing280441589/article/details/53220313" target="_blank" rel="noopener" title="岁月划过生命线(16.02 ~ 10 -提前转正)">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    岁月划过生命线(16.02 ~ 10 -提前转正)		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">11-18</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					6525</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/hanqing280441589/article/details/53220313" target="_blank" rel="noopener" title="岁月划过生命线(16.02 ~ 10 -提前转正)">
+                    <span class="desc oneline">10月9号收到了提前转正通知后就想写些总结,总结在微店的一年里见过的人、读过的书、做过的事儿,不然怕很多有意思的细节以后都忘了.但一直找借口迟迟懒得动笔,这篇总结断断续续竟写了一个月…...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/hanqing280441589">来自：	<span class="blog_title"> 菜鸟-翡青</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_34166472/article/details/89932760&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;21&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_34166472/article/details/89932760" target="_blank" rel="noopener" title="策略模式">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    策略模式		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">12-09</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					0</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_34166472/article/details/89932760" target="_blank" rel="noopener" title="策略模式">
+                    <span class="desc oneline">策略模式标签：Java与设计模式策略模式:定义一系列的算法,将其一个个封装起来,并使它们可相互替换,使得算法可独立于使用它的客户而变化.(图片来源:设计模式:可复用面向对象软件的基础)策略模式对应.....</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_34166472">来自：	<span class="blog_title"> weixin_34166472的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/one_Jachen/article/details/78157209&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;22&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/one_Jachen/article/details/78157209" target="_blank" rel="noopener" title="浅谈JVM内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    浅谈<em>JVM</em><em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-04</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/one_Jachen/article/details/78157209" target="_blank" rel="noopener" title="浅谈JVM内存模型">
+                    <span class="desc oneline">&nbsp;&nbsp;&nbsp;&nbsp;Java虚拟机在执行Java程序的过程中会把它所管理的内存划分为若干个不同的数据区域。这些区域都有各自不同的用途，以及创建和销毁时间，有些区域随着虚拟机进程的启动而存在，有些区域则依赖用户线程...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/one_Jachen">来自：	<span class="blog_title"> Jachen的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_34324081/article/details/89932981&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;23&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_34324081/article/details/89932981" target="_blank" rel="noopener" title="迭代器模式">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    迭代器模式		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">02-23</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					6</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_34324081/article/details/89932981" target="_blank" rel="noopener" title="迭代器模式">
+                    <span class="desc oneline">迭代器模式标签：Java与设计模式迭代器模式:提供一种方法顺序访问聚合对象(如List、Set)内的每个元素,而又不暴露聚合对象的内部实现.(图片来源:设计模式:可复用面向对象软件的基础)模式实现.....</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_34324081">来自：	<span class="blog_title"> weixin_34324081的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/ocean_fan/article/details/79298076&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;24&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/ocean_fan/article/details/79298076" target="_blank" rel="noopener" title="JVM内存模型详解">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em><em>内存</em><em>模型</em>详解		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">02-09</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					911</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/ocean_fan/article/details/79298076" target="_blank" rel="noopener" title="JVM内存模型详解">
+                    <span class="desc oneline">笔记大纲1、jvm内存结构图2、jvm按照线程共享和私有内存区域划分结构图3、堆和栈在功能、内存大小、线程共享私有进行比较4、JVM运行结构图5、线程安全本质时序图6、jdk6、7、8三个版本内存模型...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/ocean_fan">来自：	<span class="blog_title"> 小范的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/390767047&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;25&quot;}">
+        <a href="https://bbs.csdn.net/topics/390767047" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>jvm</em>调优问题--full gc太过频繁该如何处理		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">04-22</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">本人刚接触jvm调优不久，对调优的步骤有点迷茫，在此向大牛请教个问题： 测试软件环境：eclipse3.7，tomcat6，visualVM1.3.7，压力测试工具loaderunner11, 用lo</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/JerkSpan/article/details/88354046&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;26&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/JerkSpan/article/details/88354046" target="_blank" rel="noopener" title="Java虚拟机内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    Java虚拟机<em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">03-08</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					117</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/JerkSpan/article/details/88354046" target="_blank" rel="noopener" title="Java虚拟机内存模型">
+                    <span class="desc oneline">程序计数器：记录正在执行的虚拟机字节码地址，字节码解释器通过改变计数器的值来指定下一条需要执行的指令。虚拟机栈：主要描述Java方法的内存模型，方法执行时会创建栈帧，存放局部变量表(基本数据类型和引用...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/JerkSpan">来自：	<span class="blog_title"> Blues Feng的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_34406796/article/details/85630545&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;27&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_34406796/article/details/85630545" target="_blank" rel="noopener" title="深入理解JVM—JVM内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    深入理解<em>JVM</em>—<em>JVM</em><em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">05-30</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					32</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_34406796/article/details/85630545" target="_blank" rel="noopener" title="深入理解JVM—JVM内存模型">
+                    <span class="desc oneline">我们知道，计算机CPU和内存的交互是最频繁的，内存是我们的高速缓存区，用户磁盘和CPU的交互，而CPU运转速度越来越快，磁盘远远跟不上CPU的读写速度，才设计了内存，用户缓冲用户IO等待导致CPU的等...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_34406796">来自：	<span class="blog_title"> weixin_34406796的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_30662539/article/details/96209126&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;28&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_30662539/article/details/96209126" target="_blank" rel="noopener" title="jvm系列之-内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>jvm</em>系列之-<em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">08-07</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					37</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_30662539/article/details/96209126" target="_blank" rel="noopener" title="jvm系列之-内存模型">
+                    <span class="desc oneline">一、前言：现在的一遍的博文大多讲的是1.7的版本，当然现在使用的jdk的版本的主流是1.7和1.8。估计大家本地安装的一般都是1.8的，所以这篇博文会讲一下它们的异同点。二、jvm的内存布局以及各个区...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_30662539">来自：	<span class="blog_title"> weixin_30662539的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_20617983/article/details/81408342&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;29&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_20617983/article/details/81408342" target="_blank" rel="noopener" title="浅析JVM内存模型">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    浅析<em>JVM</em><em>内存</em><em>模型</em>		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">08-04</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2304</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_20617983/article/details/81408342" target="_blank" rel="noopener" title="浅析JVM内存模型">
+                    <span class="desc oneline">对于初学JAVA的人来说弄懂虚拟机JVM内存分布模式是很有必要的首先我们要大致明白配置JDK环境变量的用途1、环境变量、如何配置环境变量，在上一篇文章我已经做过详细的说明，这里再次强调一次，不要用单纯...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_20617983">来自：	<span class="blog_title"> 小白博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_30687051/article/details/95791761&quot;,&quot;strategy&quot;:&quot;BlogCommendFromMachineLearnPai2&quot;,&quot;index&quot;:&quot;30&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_30687051/article/details/95791761" target="_blank" rel="noopener" title="桥接模式">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    桥接模式		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">01-10</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					7</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_30687051/article/details/95791761" target="_blank" rel="noopener" title="桥接模式">
+                    <span class="desc oneline">桥接模式标签：Java与设计模式场景在商城系统中商品是分类摆放的,以电脑为例我们有以下商品分类,该如何良好的处理商品分类销售的问题:直观上我们会认为该商品分类以继承来实现:电脑作为根类,台式机/笔记本...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_30687051">来自：	<span class="blog_title"> weixin_30687051的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/391018575&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;31&quot;}">
+        <a href="https://bbs.csdn.net/topics/391018575" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                分享一个免费的<em>JVM</em>视频		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">04-16</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">JVM听起来很高大上的，学习下免费视频，先入个门吧！ 再不学习，就老了。 实战Java虚拟机，一个视频系列。</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/baidu_22254181/article/details/81980445&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;32&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/baidu_22254181/article/details/81980445" target="_blank" rel="noopener" title="JVM系列(一) - JVM总体概述">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em>系列(一) - <em>JVM</em>总体概述		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">08-23</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1630</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/baidu_22254181/article/details/81980445" target="_blank" rel="noopener" title="JVM系列(一) - JVM总体概述">
+                    <span class="desc oneline">前言JVM是JavaVirtualMachine(Java虚拟机)的缩写，JVM是一种用于计算设备的规范，它是一个虚构的计算机，是通过在实际的计算机上仿真模拟各种计算机功能来实现的。JVM屏蔽了与具体...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/baidu_22254181">来自：	<span class="blog_title"> 陌上轩客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/392569879&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;33&quot;}">
+        <a href="https://bbs.csdn.net/topics/392569879" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                用pytorch训练<em>模型</em>，报GPU显存不够的错误		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">04-21</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">这个是报错信息RuntimeError: CUDA out of memory. Tried to allocate 14.13 MiB (GPU 0; 6.00 GiB total capacity</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_37761074/article/details/86361316&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;34&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_37761074/article/details/86361316" target="_blank" rel="noopener" title="JVM内存模型完整图解">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    <em>JVM</em><em>内存</em><em>模型</em>完整图解		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">01-12</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					610</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_37761074/article/details/86361316" target="_blank" rel="noopener" title="JVM内存模型完整图解">
+                    <span class="desc oneline">最近研究内存模型，读了深入JVM的书和相关博客，画出了一个完整的JVM内存模型，下面上图：阅读相关博客可参考具体文字描述：https://www.cnblogs.com/dingyingsi/p/37...</span>
+                </a>
+                <span class="blog_title_box oneline ">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+											<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_37761074">来自：	<span class="blog_title"> 斯文流氓骚刚的博客</span></a>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box  recommend-other-item-box" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://bbs.csdn.net/topics/350047463&quot;,&quot;strategy&quot;:&quot;BlogCommendFromBaidu&quot;,&quot;index&quot;:&quot;35&quot;}">
+        <a href="https://bbs.csdn.net/topics/350047463" target="_blank" rel="noopener">
+            <h4 class="text-truncate oneline" style="width: 876px;">
+                <em>JVM</em>调优高手进		</h4>
+            <div class="info-box d-flex align-content-center">
+                <span class="date">09-13</span>
+            </div>
+            <p class="content oneline" style="width: 962px;">
+                <span class="desc oneline">945188.489: 552200K-&gt;344514K(1022400K), 0.0507700 secs] 945242.102: 554306K-&gt;346710K(1022400K), 0.06</span>
+                <span class="type-show type-show-bbs">论坛</span>
+            </p>
+        </a>
+
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/guyuealian/article/details/100078444&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;0&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/guyuealian/article/details/100078444" target="_blank" rel="noopener" title="docker学习笔记">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    docker学习笔记		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-17</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					382</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/guyuealian/article/details/100078444" target="_blank" rel="noopener" title="docker学习笔记">
+				<span class="desc oneline">docker学习笔记
+
+Docker是什么？
+
+Docker是一个虚拟环境容器，可以将你的开发环境、代码、配置文件等一并打包到这个容器中，并发布和应用到任意平台中。比如，你在本地用Python开发网站...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/z694644032/article/details/100084287&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;1&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/z694644032/article/details/100084287" target="_blank" rel="noopener" title="学会了这些技术，你离BAT大厂不远了">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    学会了这些技术，你离BAT大厂不远了		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">08-26</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/z694644032/article/details/100084287" target="_blank" rel="noopener" title="学会了这些技术，你离BAT大厂不远了">
+                    <span class="desc oneline">每一个程序员都有一个梦想，梦想着能够进入阿里、腾讯、字节跳动、百度等一线互联网公司，由于身边的环境等原因，不知道 BAT 等一线互联网公司使用哪些技术？或者该如何去学习这些技术？或者我该去哪些获取这些...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/m0_38106923/article/details/100130354&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;2&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/m0_38106923/article/details/100130354" target="_blank" rel="noopener" title="程序员实用工具网站">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    程序员实用工具网站		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-04</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					11万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/m0_38106923/article/details/100130354" target="_blank" rel="noopener" title="程序员实用工具网站">
+				<span class="desc oneline">目录
+
+1、搜索引擎
+
+2、PPT
+
+3、图片操作
+
+4、文件共享
+
+5、应届生招聘
+
+6、程序员面试题库
+
+7、办公、开发软件
+
+8、高清图片、视频素材网站
+
+9、项目开源
+
+10、在线工具宝典大全...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/devcloud/article/details/100698417&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;3&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/devcloud/article/details/100698417" target="_blank" rel="noopener" title="挑战10个最难的Java面试题（附答案）【上】">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    挑战10个最难的Java面试题（附答案）【上】		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-10</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/devcloud/article/details/100698417" target="_blank" rel="noopener" title="挑战10个最难的Java面试题（附答案）【上】">
+                    <span class="desc oneline">这是收集的10个最棘手的Java面试问题列表。这些问题主要来自 Java 核心部分 ,不涉及 Java EE 相关问题。你可能知道这些棘手的 Java 问题的答案，或者觉得这些不足以挑战你的 Java...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_40693171/article/details/100716766&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;4&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_40693171/article/details/100716766" target="_blank" rel="noopener" title="我花了一夜用数据结构给女朋友写个H5走迷宫游戏">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    我花了一夜用数据结构给女朋友写个H5走迷宫游戏		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-21</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					6万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_40693171/article/details/100716766" target="_blank" rel="noopener" title="我花了一夜用数据结构给女朋友写个H5走迷宫游戏">
+				<span class="desc oneline">起因
+
+又到深夜了，我按照以往在csdn和公众号写着数据结构！这占用了我大量的时间！我的超越妹妹严重缺乏陪伴而 怨气满满！
+
+而女朋友时常埋怨，认为数据结构这么抽象难懂的东西没啥作用，常会问道...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_36903042/article/details/100798101&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;5&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_36903042/article/details/100798101" target="_blank" rel="noopener" title="别再翻了，面试二叉树看这 11 个就够了~">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    别再翻了，面试二叉树看这 11 个就够了~		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_36903042/article/details/100798101" target="_blank" rel="noopener" title="别再翻了，面试二叉树看这 11 个就够了~">
+				<span class="desc oneline">写在前边
+数据结构与算法：
+不知道你有没有这种困惑，虽然刷了很多算法题，当我去面试的时候，面试官让你手写一个算法，可能你对此算法很熟悉，知道实现思路，但是总是不知道该在什么地方写，而且很多边界条件想不...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/m0_38106923/article/details/101050788&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;6&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/m0_38106923/article/details/101050788" target="_blank" rel="noopener" title="GitHub开源的10个超棒后台管理面板">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    GitHub开源的10个超棒后台管理面板		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-21</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/m0_38106923/article/details/101050788" target="_blank" rel="noopener" title="GitHub开源的10个超棒后台管理面板">
+				<span class="desc oneline">目录
+
+1、AdminLTE
+
+2、vue-Element-Admin
+
+3、tabler
+
+4、Gentelella
+
+5、ng2-admin
+
+6、ant-design-pro
+
+7、blur-a...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/devcloud/article/details/101199255&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;7&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/devcloud/article/details/101199255" target="_blank" rel="noopener" title="100 个网络基础知识普及，看完成半个网络高手">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    100 个网络基础知识普及，看完成半个网络高手		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-23</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					7万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/devcloud/article/details/101199255" target="_blank" rel="noopener" title="100 个网络基础知识普及，看完成半个网络高手">
+                    <span class="desc oneline">欢迎添加华为云小助手微信（微信号：HWCloud002或HWCloud003），输入关键字“加群”，加入华为云线上技术讨论群；输入关键字“最新活动”，获取华为云最新特惠促销。华为云诸多技术大咖、特惠活...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/harvic880925/article/details/101511637&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;8&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/harvic880925/article/details/101511637" target="_blank" rel="noopener" title="对计算机专业来说学历真的重要吗？">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    对计算机专业来说学历真的重要吗？		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-27</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/harvic880925/article/details/101511637" target="_blank" rel="noopener" title="对计算机专业来说学历真的重要吗？">
+				<span class="desc oneline">我本科学校是渣渣二本，研究生学校是985，现在毕业五年，校招笔试、面试，社招面试参加了两年了，就我个人的经历来说下这个问题。
+
+这篇文章很长，但绝对是精华，相信我，读完以后，你会知道学历不好的解决方案...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/wo541075754/article/details/101554326&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;9&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/wo541075754/article/details/101554326" target="_blank" rel="noopener" title="世界上最好的学习法：费曼学习法">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    世界上最好的学习法：费曼学习法		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-27</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/wo541075754/article/details/101554326" target="_blank" rel="noopener" title="世界上最好的学习法：费曼学习法">
+                    <span class="desc oneline">你是否曾幻想读一遍书就记住所有的内容？是否想学习完一项技能就马上达到巅峰水平？除非你是天才，不然这是不可能的。对于大多数的普通人来说，可以通过笨办法（死记硬背）来达到学习的目的，但效率低下。当然，也可...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/ZackSock/article/details/101594794&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;10&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/ZackSock/article/details/101594794" target="_blank" rel="noopener" title="深入理解C语言指针">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    深入理解C语言指针		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-28</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					4万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/ZackSock/article/details/101594794" target="_blank" rel="noopener" title="深入理解C语言指针">
+				<span class="desc oneline">一、指针的概念
+要知道指针的概念，要先了解变量在内存中如何存储的。在存储时，内存被分为一块一块的。每一块都有一个特有的编号。而这个编号可以暂时理解为指针，就像酒店的门牌号一样。
+1.1、变量和地址
+先...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/ZackSock/article/details/101645494&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;11&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/ZackSock/article/details/101645494" target="_blank" rel="noopener" title="C语言实现推箱子游戏">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    C语言实现推箱子游戏		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-29</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					4万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/ZackSock/article/details/101645494" target="_blank" rel="noopener" title="C语言实现推箱子游戏">
+				<span class="desc oneline">很早就想过做点小游戏了，但是一直没有机会动手。今天闲来无事，动起手来。过程还是蛮顺利的，代码也不是非常难。今天给大家分享一下~
+一、介绍
+开发语言：C语言
+开发工具：Dev-C++ 5.11
+日期：2...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/coderising/article/details/101731213&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;12&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/coderising/article/details/101731213" target="_blank" rel="noopener" title="C语言这么厉害，它自身又是用什么语言写的？">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    C语言这么厉害，它自身又是用什么语言写的？		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">09-27</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/coderising/article/details/101731213" target="_blank" rel="noopener" title="C语言这么厉害，它自身又是用什么语言写的？">
+                    <span class="desc oneline">这是来自我的星球的一个提问：“C语言本身用什么语言写的？”换个角度来问，其实是：C语言在运行之前，得编译才行，那C语言的编译器从哪里来？ 用什么语言来写的？如果是用C语......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/BEYONDMA/article/details/101915785&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;13&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/BEYONDMA/article/details/101915785" target="_blank" rel="noopener" title="终于鸿蒙微内核弄懂了-程序员和鼓励师的合作">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    终于鸿蒙微内核弄懂了-程序员和鼓励师的合作		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1587</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/BEYONDMA/article/details/101915785" target="_blank" rel="noopener" title="终于鸿蒙微内核弄懂了-程序员和鼓励师的合作">
+                    <span class="desc oneline">当鸿蒙OS宣布开源的时候，各种空洞的炒作，几乎把国产操作系统的技术本质掩盖了，虽然笔者没亲眼见过鸿蒙的代码，也没用方舟成功编译什么程序，不过当华为官宣鸿蒙将使用微内核的时候其实这款OS的风格就已经确定...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/duxinshuxiaobian/article/details/102218308&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;14&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102218308" target="_blank" rel="noopener" title="十大优秀编程项目，让你的简历金光闪闪">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    十大优秀编程项目，让你的简历金光闪闪		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-06</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102218308" target="_blank" rel="noopener" title="十大优秀编程项目，让你的简历金光闪闪">
+				<span class="desc oneline">全文共3241字，预计学习时长6分钟
+
+
+
+被问到如何学习编程时，最常听到的问题就是：“有没有什么新项目的好点子？”
+
+一些老套的答案有：“做一个象棋游戏”或者“命令行界面”。
+
+这些答案没有错，但这...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_40693171/article/details/102220448&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;15&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_40693171/article/details/102220448" target="_blank" rel="noopener" title="第二弹！python爬虫批量下载高清大图">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    第二弹！python爬虫批量下载高清大图		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-06</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_40693171/article/details/102220448" target="_blank" rel="noopener" title="第二弹！python爬虫批量下载高清大图">
+				<span class="desc oneline">文章目录前言下载免费高清大图下载带水印的精选图代码与总结
+前言
+在上一篇写文章没高质量配图？python爬虫绕过限制一键搜索下载图虫创意图片！中，我们在未登录的情况下实现了图虫创意无水印高清小图的...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hyg0811/article/details/102366854&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;16&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/hyg0811/article/details/102366854" target="_blank" rel="noopener" title="面试官，不要再问我三次握手和四次挥手">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    面试官，不要再问我三次握手和四次挥手		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-08</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					9万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/hyg0811/article/details/102366854" target="_blank" rel="noopener" title="面试官，不要再问我三次握手和四次挥手">
+				<span class="desc oneline">三次握手和四次挥手是各个公司常见的考点，也具有一定的水平区分度，也被一些面试官作为热身题。很多小伙伴说这个问题刚开始回答的挺好，但是后面越回答越冒冷汗，最后就歇菜了。
+见过比较典型的面试场景是这样的:...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a419240016/article/details/102383655&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;17&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/a419240016/article/details/102383655" target="_blank" rel="noopener" title="免费申请 HTTPS 证书，开启全站 HTTPS">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    免费申请 HTTPS 证书，开启全站 HTTPS		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-04</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					219</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/a419240016/article/details/102383655" target="_blank" rel="noopener" title="免费申请 HTTPS 证书，开启全站 HTTPS">
+                    <span class="desc oneline">作者：HelloGitHub-追梦人物文中涉及的示例代码，已同步更新到 HelloGitHub-Team 仓库[1]点击本文最下方的“阅读原文”即可获取HTTP 报文以明......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/qq_36772866/article/details/102384240&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;18&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/qq_36772866/article/details/102384240" target="_blank" rel="noopener" title="一些实用的GitHub项目">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    一些实用的GitHub项目		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-05</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/qq_36772866/article/details/102384240" target="_blank" rel="noopener" title="一些实用的GitHub项目">
+                    <span class="desc oneline">最近整理了一些在GitHub上比较热门的开源项目关于GitHub，快速了解请戳这里其中涵盖了：学习教程，面试总结，实用工具，框架，机器学习等东西比较杂，要学的东西也比较多......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/kexuanxiu1163/article/details/102385463&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;19&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/kexuanxiu1163/article/details/102385463" target="_blank" rel="noopener" title="生猛！看 AV 神器来了！实时把画质变成 4k 高清，延时仅3毫秒，登上GitHub 趋势榜！...">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    生猛！看 AV 神器来了！实时把画质变成 4k 高清，延时仅3毫秒，登上GitHub 趋势榜！...		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-06</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/kexuanxiu1163/article/details/102385463" target="_blank" rel="noopener" title="生猛！看 AV 神器来了！实时把画质变成 4k 高清，延时仅3毫秒，登上GitHub 趋势榜！...">
+                    <span class="desc oneline">点击上方“五分钟学算法”，选择“星标”在看真爱量子位 出品 | 公众号 QbitAI看动画(特别是里番/P站)的时候，总会觉得画质不够好，就算已经有1080p，还是......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/duxinshuxiaobian/article/details/102386988&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;20&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102386988" target="_blank" rel="noopener" title="新手程序员成长之路的五本必读书籍（附资源下载）">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    新手程序员成长之路的五本必读书籍（附资源下载）		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-05</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102386988" target="_blank" rel="noopener" title="新手程序员成长之路的五本必读书籍（附资源下载）">
+                    <span class="desc oneline">全文共3351字，预计学习时长7分钟图片来自Pixabay，IvanPais书籍可以清晰而有条理地陈诉观点，纸张上的笔墨也会给人一种不慌不忙的感觉。不过，科技类书籍存在一......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/duxinshuxiaobian/article/details/102386989&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;21&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102386989" target="_blank" rel="noopener" title="“我想学习人工智能与机器学习，该从何做起？”">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    “我想学习人工智能与机器学习，该从何做起？”		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-05</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3887</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102386989" target="_blank" rel="noopener" title="“我想学习人工智能与机器学习，该从何做起？”">
+                    <span class="desc oneline">全文共3753字，预计学习时长7分钟图源山姆·伯克（Sam Bourke）在自学机器学习时，经常有人问：我该从哪学起？我需要达到怎样的数学水平呢？我学过Python了，那......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/One_L_Star/article/details/102394373&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;22&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/One_L_Star/article/details/102394373" target="_blank" rel="noopener" title="Java入门学习路线目录索引">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    Java入门学习路线目录索引		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-08</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					8165</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/One_L_Star/article/details/102394373" target="_blank" rel="noopener" title="Java入门学习路线目录索引">
+				<span class="desc oneline">一、Java基础
+
+Java基础-继承
+	Java基础-抽象
+	Java基础-接口
+	Java基础-多态
+	Java基础-重写
+	Java基础-匿名对象
+	Java基础-内部类
+	Java基础-fin...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_38405253/article/details/102426549&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;23&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_38405253/article/details/102426549" target="_blank" rel="noopener" title="分布式、多线程、高并发都不懂，拿什么去跳槽">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    分布式、多线程、高并发都不懂，拿什么去跳槽		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-08</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_38405253/article/details/102426549" target="_blank" rel="noopener" title="分布式、多线程、高并发都不懂，拿什么去跳槽">
+                    <span class="desc oneline">当提起这三个词的时候，是不是很多人都认为分布式=高并发=多线程？当面试官问到高并发系统可以采用哪些手段来解决，或者被问到分布式系统如何解决一致性的问题，是不是一脸懵逼？确......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/duxinshuxiaobian/article/details/102480959&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;24&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102480959" target="_blank" rel="noopener" title="30秒内便能学会的30个超实用Python代码片段">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    30秒内便能学会的30个超实用Python代码片段		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-10</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/duxinshuxiaobian/article/details/102480959" target="_blank" rel="noopener" title="30秒内便能学会的30个超实用Python代码片段">
+				<span class="desc oneline">许多人在数据科学、机器学习、web开发、脚本编写和自动化等领域中都会使用Python，它是一种十分流行的语言。
+
+
+
+
+
+Python流行的部分原因在于简单易学。
+
+
+
+本文将简要...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_45372014/article/details/102502211&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;25&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_45372014/article/details/102502211" target="_blank" rel="noopener" title="python入门的120个基础练习">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    python入门的120个基础练习		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-11</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1万+</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_45372014/article/details/102502211" target="_blank" rel="noopener" title="python入门的120个基础练习">
+				<span class="desc oneline">python入门的120个基础练习
+解决问题的道路上，＂方法＂和＂坚持＂缺一不可。
+----------------------------------------------------------...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_44807144/article/details/102510056&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;26&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_44807144/article/details/102510056" target="_blank" rel="noopener" title="JAVA-快速了解线程池的基本原理">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    JAVA-快速了解线程池的基本原理		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-16</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2401</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_44807144/article/details/102510056" target="_blank" rel="noopener" title="JAVA-快速了解线程池的基本原理">
+				<span class="desc oneline">前言
+说起线程池大家肯定不会陌生，在面试中属于必问的问题之一，特别是对于高并发有较高要求的企业，基本是核心打分点。网上关于线程池的文章和视频很多，本篇文章旨在帮助大家快速了解和掌握线程池的原理，对于...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/TeFuirnever/article/details/102513712&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;27&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/TeFuirnever/article/details/102513712" target="_blank" rel="noopener" title="TensorFlow2.0 学习笔记（一）：TensorFlow 2.0 的安装和环境配置以及上手初体验">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    TensorFlow2.0 学习笔记（一）：TensorFlow 2.0 的安装和环境配置以及上手初体验		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3316</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/TeFuirnever/article/details/102513712" target="_blank" rel="noopener" title="TensorFlow2.0 学习笔记（一）：TensorFlow 2.0 的安装和环境配置以及上手初体验">
+				<span class="desc oneline">文章目录一、TensorFlow 概述二、TensorFlow 特性三、TensorFlow 2.0 安装与环境配置
+一、TensorFlow 概述
+
+人工智能和深度学习的热潮将 TensorFlow...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/wo541075754/article/details/102530810&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;28&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/wo541075754/article/details/102530810" target="_blank" rel="noopener" title="Java8 Lambda表达式详解手册及实例">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    Java8 Lambda表达式详解手册及实例		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					4904</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/wo541075754/article/details/102530810" target="_blank" rel="noopener" title="Java8 Lambda表达式详解手册及实例">
+                    <span class="desc oneline">先贩卖一下焦虑，Java8发于2014年3月18日，距离现在已经快6年了，如果你对Java8的新特性还没有应用，甚至还一无所知，那你真得关注公众号“程序新视界”，好好系列的学习一下Java8的新特性。...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/diangangqin/article/details/102531708&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;29&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/diangangqin/article/details/102531708" target="_blank" rel="noopener" title="失败程序员的十年总结">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    失败程序员的十年总结		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3876</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/diangangqin/article/details/102531708" target="_blank" rel="noopener" title="失败程序员的十年总结">
+                    <span class="desc oneline">十年到底有多长？当我回顾过去的十年，发现好短，可以讲的事情没有几件，而且都是坏事；当我畅想未来的十年，感觉又好长，不知道路怎么走。...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_38405253/article/details/102532052&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;30&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_38405253/article/details/102532052" target="_blank" rel="noopener" title="多线程基础体系知识清单">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    多线程基础体系知识清单		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					400</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_38405253/article/details/102532052" target="_blank" rel="noopener" title="多线程基础体系知识清单">
+				<span class="desc oneline">前言
+
+本文会介绍Java中多线程与并发的基础，适合初学者食用。
+
+线程与进程的区别
+
+在计算机发展初期，每台计算机是串行地执行任务的，如果碰上需要IO的地方，还需要等待长时间的用户IO，后来经过一段...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/weixin_44613063/article/details/102538757&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;31&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/weixin_44613063/article/details/102538757" target="_blank" rel="noopener" title="Python搭建代理IP池（一）- 获取 IP">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    Python搭建代理IP池（一）- 获取 IP		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2168</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/weixin_44613063/article/details/102538757" target="_blank" rel="noopener" title="Python搭建代理IP池（一）- 获取 IP">
+                    <span class="desc oneline">使用爬虫时，大部分网站都有一定的反爬措施，有些网站会限制每个 IP 的访问速度或访问次数，超出了它的限制你的 IP 就会被封掉。对于访问速度的处理比较简单，只要间隔一段时间爬取一次就行了，避免频繁访问...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/yuanziok/article/details/102542342&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;32&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/yuanziok/article/details/102542342" target="_blank" rel="noopener" title="可视化越做越丑？这五个高级图表效果能瞬间抬升你的逼格">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    可视化越做越丑？这五个高级图表效果能瞬间抬升你的逼格		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					4404</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/yuanziok/article/details/102542342" target="_blank" rel="noopener" title="可视化越做越丑？这五个高级图表效果能瞬间抬升你的逼格">
+				<span class="desc oneline">今天我们来说一说数据可视化，想必很多人在入门数据分析之后，就会经常进行可视化的工作，所谓一图胜千言，图表用的好，真的是会事半功倍的。但现实情况下，很多人遇到的问题是：
+
+你做的图表太丑了？你做的图表到...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/hollis_chuang/article/details/102542347&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;33&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/hollis_chuang/article/details/102542347" target="_blank" rel="noopener" title="感觉自己不会的东西太多了，不知道如何下手？">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    感觉自己不会的东西太多了，不知道如何下手？		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					6287</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/hollis_chuang/article/details/102542347" target="_blank" rel="noopener" title="感觉自己不会的东西太多了，不知道如何下手？">
+				<span class="desc oneline">GitHub 8.8k Star 的Java工程师成神之路 ，不来了解一下吗?
+GitHub 8.8k Star 的Java工程师成神之路 ，真的不来了解一下吗?
+GitHub 8.8k Star 的...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xiangzhihong8/article/details/102545853&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;34&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/xiangzhihong8/article/details/102545853" target="_blank" rel="noopener" title="做技术，35岁，你慌了吗">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    做技术，35岁，你慌了吗		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3622</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/xiangzhihong8/article/details/102545853" target="_blank" rel="noopener" title="做技术，35岁，你慌了吗">
+				<span class="desc oneline">35岁，是互联网从业者，尤其是程序员的一道坎。在“996”盛行的互联网行业，受欢迎的永远是28岁左右精力无限的年轻人。你不会永远年轻，但永远有人年轻。
+当你年纪大了，熬不了夜了，加不了班了，还能吃得了...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/xcbeyond/article/details/102548170&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;35&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/xcbeyond/article/details/102548170" target="_blank" rel="noopener" title="别死写代码了，方法比结果更重要">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    别死写代码了，方法比结果更重要		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					1260</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/xcbeyond/article/details/102548170" target="_blank" rel="noopener" title="别死写代码了，方法比结果更重要">
+                    <span class="desc oneline">点击上方“程序猿技术大咖”，选择“关注公众号”，一起共进步！如果每个程序开发人员都只是周而复始地写代码，想必编程的工作就会让很多程序员发狂。那么如何在枯燥的工作中寻找乐趣......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/u010459192/article/details/102548299&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;36&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/u010459192/article/details/102548299" target="_blank" rel="noopener" title="据说中台凉了？唔，真香">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    据说中台凉了？唔，真香		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-12</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					319</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/u010459192/article/details/102548299" target="_blank" rel="noopener" title="据说中台凉了？唔，真香">
+				<span class="desc oneline">全文长度: 2200字
+
+阅读时间: 8分钟
+
+TL;DR(too long don'tread)
+
+1、业务中台就是流程模板+扩展点
+
+2、没法很好抽象就别做中台，没那么多需求和业务线就别做中台。
+...</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/csdnnews/article/details/102548475&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;37&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/csdnnews/article/details/102548475" target="_blank" rel="noopener" title="为什么程序员在学习编程的时候什么都记不住？">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    为什么程序员在学习编程的时候什么都记不住？		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-12</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					3683</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/csdnnews/article/details/102548475" target="_blank" rel="noopener" title="为什么程序员在学习编程的时候什么都记不住？">
+                    <span class="desc oneline">在程序员的职业生涯中，记住所有你接触过的代码是一件不可能的事情！那么我们该如何解决这一问题？作者 |Dylan Mestyanek译者 | 弯月，责编 | 屠敏出品 |......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/a724888/article/details/102548517&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;38&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/a724888/article/details/102548517" target="_blank" rel="noopener" title="成长的第一步是走出舒适区">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    成长的第一步是走出舒适区		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-13</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					5232</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/a724888/article/details/102548517" target="_blank" rel="noopener" title="成长的第一步是走出舒适区">
+                    <span class="desc oneline">阅读本文大概需要 2.8 分钟。在温室里呆习惯了，就很难去适应室外环境，在一个圈子呆久了，就会把一切都会当成是理所当然，不想再去适应第二个圈子，即使他们可能更好。很多人觉......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_blog clearfix" data-report-click="{&quot;mod&quot;:&quot;popu_387&quot;,&quot;dest&quot;:&quot;https://blog.csdn.net/singwhatiwanna/article/details/102549659&quot;,&quot;strategy&quot;:&quot;BlogCommendHotData&quot;,&quot;index&quot;:&quot;39&quot;}">
+        <div class="content" style="width: 962px;">
+            <a href="https://blog.csdn.net/singwhatiwanna/article/details/102549659" target="_blank" rel="noopener" title="出名要趁早！">
+                <h4 class="text-truncate oneline" style="width: 802px;">
+                    出名要趁早！		</h4>
+                <div class="info-box d-flex align-content-center">
+                    <p class="date-and-readNum oneline">
+                        <span class="date hover-show">10-14</span>
+                        <span class="read-num hover-hide">
+					阅读数
+					2582</span>
+                    </p>
+                </div>
+            </a>
+            <p class="content" style="width: 962px;">
+                <a href="https://blog.csdn.net/singwhatiwanna/article/details/102549659" target="_blank" rel="noopener" title="出名要趁早！">
+                    <span class="desc oneline">出名要趁早，很多人都听过，但具体的意思不知道大家有没有思考过。除了出名以外，很多事情都要趁早，比如恋爱、买房、买车、事业。拿恋爱来说，初中高中叫早恋，大学叫恋爱，30岁应......</span>
+                </a>
+                <span class="blog_title_box oneline no-title">
+									<span class="type-show type-show-blog type-show-after">博文</span>
+												</span>
+            </p>
+        </div>
+    </div>
+
+
+
+    <div class="recommend-item-box type_hot_word">
+        <div class="content clearfix" style="width: 962px;">
+            <div class="float-left">
+                                        <span>
+                        <a href="https://www.csdn.net/gather_1e/MtjaIgwsLWRvd25sb2Fk.html" target="_blank">
+                        c#引入dll文件报错</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_10/MtjaIgxsLWRvd25sb2Fk.html" target="_blank">
+                        c#根据名称实例化</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_1b/MtjaIgysLWRvd25sb2Fk.html" target="_blank">
+                        c#从邮件服务器获取邮件</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_11/MtjaIgzsLWRvd25sb2Fk.html" target="_blank">
+                        c# 保存文件夹</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_11/MtjaIg0sLWRvd25sb2Fk.html" target="_blank">
+                        c#代码打包引用</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_1d/MtjaIg1sLWRvd25sb2Fk.html" target="_blank">
+                        c# 压缩效率</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_19/MtjaIg2sLWRvd25sb2Fk.html" target="_blank">
+                        c#教学 csdn</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_17/MtjaIg3sLWRvd25sb2Fk.html" target="_blank">
+                        c#开发前端</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_17/MtjaIg4sLWRvd25sb2Fk.html" target="_blank">
+                        c#如何将字符串格式化</a>
+                    </span>
+                <span>
+                        <a href="https://www.csdn.net/gather_15/MtjaIg5sLWRvd25sb2Fk.html" target="_blank">
+                        c#引用dll不成功</a>
+                    </span>
+            </div>
+        </div>
+    </div>
+    <div class="recommend-loading-box">
+        <img src="https://csdnimg.cn/release/phoenix/images/feedLoading.gif">
+    </div>
+    <div class="recommend-end-box" style="display: block;">
+        <p class="text-center">没有更多推荐了，<a href="https://blog.csdn.net/" class="c-blue c-blue-hover c-blue-focus">返回首页</a></p>
+    </div>
+</div>
+<div class="template-box">
+    <span>©️2019 CSDN</span><span class="point"></span>
+    <span>皮肤主题: 大白</span>
+    <span> 设计师:
+                                    CSDN官方博客                            </span>
+</div>
+
+</body>
+</html>
