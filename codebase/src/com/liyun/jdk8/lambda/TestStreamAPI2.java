@@ -1,4 +1,4 @@
-package com.liyun.lambda.guigu;
+package com.liyun.jdk8.lambda;
 
 import org.junit.jupiter.api.Test;
 

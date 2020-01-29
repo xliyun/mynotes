@@ -1,4 +1,4 @@
-package com.liyun.lambda.guigu;
+package com.liyun.jdk8.lambda;
 
 /**
  * @description:
@@ -10,10 +10,30 @@ public class Employee {
     private Integer age;
     private Double salary;
 
+    public Employee() {
+    }
+
+    private Status status;
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
     public Employee(String name, Integer age, Double salary) {
         this.name = name;
         this.age = age;
         this.salary = salary;
+    }
+
+    public Employee(String name, Integer age, Double salary, Status status) {
+        this.name = name;
+        this.age = age;
+        this.salary = salary;
+        this.status = status;
     }
 
     public String getName() {
@@ -38,5 +58,11 @@ public class Employee {
 
     public void setSalary(Double salary) {
         this.salary = salary;
+    }
+
+    public enum Status{
+        FREE,
+        BUSY,
+        VOCATION;
     }
 }
