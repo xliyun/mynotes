@@ -1,6 +1,6 @@
 package com.liyun.jdk8.lambda;
 
-import com.liyun.learcn.Static.Student;
+import com.liyun.learn.Static.Student;
 
 import java.io.PrintStream;
 import java.util.Comparator;
