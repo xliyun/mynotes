@@ -1,5 +1,5 @@
 ---
-title: ./redis持久化
+title: https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化
 date: 2019-11-10 10:04:17
 tags: 
  - nosql
@@ -12,7 +12,7 @@ Redis的持久化方式分为RDB和AOF两种方式。这篇笔记记录了RDB和
 
 <!-- more -->
 
-# ./redis持久化数据
+# https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化数据
 
 持久化方式有：
 
@@ -36,7 +36,7 @@ Redis的持久化方式分为RDB和AOF两种方式。这篇笔记记录了RDB和
 4. save自动配置满足任一就会被执行
 5. 有些触发机制不容忽视
 
-![1573352163830](./redis持久化/1573352163830.png)
+![1573352163830](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573352163830.png)
 
 ## 触发机制-只要三种方式
 
@@ -44,13 +44,13 @@ Redis的持久化方式分为RDB和AOF两种方式。这篇笔记记录了RDB和
 
 使用save命令，就会开始以同步命令的方式同步文件
 
-![1573356330172](./redis持久化/1573356330172.png)
+![1573356330172](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573356330172.png)
 
 **文件策略**
 
 生成一个新的文件，替换老的RDB文件
 
-![1573352843028](./redis持久化/1573352843028.png)
+![1573352843028](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573352843028.png)
 
 ### bgsave(异步)
 
@@ -58,7 +58,7 @@ Redis的持久化方式分为RDB和AOF两种方式。这篇笔记记录了RDB和
 
 注意：如果fork()函数执行的慢，依然会阻塞redis，一般fork函数足够快，所以redis会正常的响应客户端
 
-![1573353011266](./redis持久化/1573353011266.png)
+![1573353011266](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573353011266.png)
 
 **文件策略**
 
@@ -80,7 +80,7 @@ Redis的持久化方式分为RDB和AOF两种方式。这篇笔记记录了RDB和
 
 Redis提供了RDB的save配置，其实就是内部执行了bgsave
 
-![1573354435631](./redis持久化/1573354435631.png)
+![1573354435631](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573354435631.png)
 
 **默认配置**
 
@@ -165,7 +165,7 @@ https://blog.csdn.net/qq_42695926/article/details/83069308
 
    redis将内存的数据dump到硬盘当中，生成rdb文件
 
-   ![1573376564295](./redis持久化/1573376564295.png)
+   ![1573376564295](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573376564295.png)
 
    - O(n)数据：耗时
    - fork()：消耗内存，copy-on-write策略
@@ -196,9 +196,9 @@ AOF后台执行的方式和RDB有类似的地方，fork一个子进程，主进�
 
 >  https://www.cnblogs.com/williamjie/p/9546663.html
 
-![1573377139829](./redis持久化/1573377139829.png)
+![1573377139829](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573377139829.png)
 
-![1573377206741](./redis持久化/1573377206741.png)
+![1573377206741](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573377206741.png)
 
 ### AOF三种策略(SAVE的三种策略)
 
@@ -210,19 +210,19 @@ always
 
 每条命令都写入到硬盘当中
 
-![1573377309501](./redis持久化/1573377309501.png)
+![1573377309501](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573377309501.png)
 
 everysec
 
 每秒把数据刷新到硬盘（是配置的默认值）
 
-![1573377478670](./redis持久化/1573377478670.png)
+![1573377478670](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573377478670.png)
 
 no
 
 由系统决定什么时候刷新
 
-![1573378830493](./redis持久化/1573378830493.png)
+![1573378830493](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573378830493.png)
 
 always、everysec、no
 
@@ -238,7 +238,7 @@ AOP重写的好处
 - 减少磁盘用量
 - 加快恢复速度
 
-![1573379353372](./redis持久化/1573379353372.png)
+![1573379353372](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573379353372.png)
 
 
 
@@ -248,7 +248,7 @@ AOP重写的好处
 
 （这里就是往硬盘里重写数据，上面的图只是为了演示）
 
-![1573379996674](./redis持久化/1573379996674.png)
+![1573379996674](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573379996674.png)
 
 #### **AOF重写配置**
 
@@ -285,7 +285,7 @@ aof_base_size
 
 
 
-![1573381041904](./redis持久化/1573381041904.png)
+![1573381041904](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573381041904.png)
 
 
 
@@ -438,23 +438,23 @@ https://blog.csdn.net/yangyutong0506/article/details/46880773
 
 
 
-![1573458936954](./redis持久化/1573458936954.png)
+![1573458936954](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573458936954.png)
 
 
 
 从
 
-![1573459049345](./redis持久化/1573459049345.png)
+![1573459049345](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573459049345.png)
 
 和info persistence命令（每发生一次，就会加1）
 
-![1573459064885](./redis持久化/1573459064885.png)
+![1573459064885](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573459064885.png)
 
 都可以看到
 
 还可以通过top命令
 
-![1573459302641](./redis持久化/1573459302641.png)
+![1573459302641](https://github.com/xliyun/mynotes/blob/master/笔记/redis/redis持久化/1573459302641.png)
 
 ### 单机多实例部署
 
