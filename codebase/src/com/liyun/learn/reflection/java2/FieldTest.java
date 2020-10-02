@@ -1,7 +1,7 @@
 package com.liyun.learn.reflection.java2;
 
 import com.liyun.learn.reflection.java1.Person;
-import org.junit.jupiter.api.Test;
+//import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -11,7 +11,7 @@ import java.lang.reflect.Modifier;
  */
 public class FieldTest {
 
-    @Test
+//    @Test
     public void test1(){
         Class clazz = Person.class;
 
@@ -30,7 +30,7 @@ public class FieldTest {
     }
 
     //权限修饰符 数据类型 变量名 = 。 。
-    @Test
+//    @Test
     public void test2(){
         Class clazz = Person.class;
         Field[] declaredFields = clazz.getDeclaredFields();

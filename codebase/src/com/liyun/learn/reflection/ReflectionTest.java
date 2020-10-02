@@ -83,7 +83,7 @@ public class ReflectionTest {
          称为类的加载。
          加载到内存中的类，我们称为运行时类，就作为Class的一个实例。
 
-         2、换句话说，Class的示例就是对应着一个运行时类
+         2、换句话说，Class的实例就是对应着一个运行时类
          3.加载到内存中的运行时类，会缓存一定的时间。在此时间之内，我们可以通过不同的方式来获取运行时类
          */
 
@@ -145,7 +145,7 @@ public class ReflectionTest {
                 classPath = "java.lang.Object";
                 break;
             case 2:
-                classPath = "com.liyun.learcn.reflection.Person";
+                classPath = "com.liyun.learn.reflection.Person";
                 break;
             default:
                 break;

@@ -62,6 +62,7 @@ public class MethodTest {
             if(!(parameterTypes == null || parameterTypes.length==0)){
                 for (int i = 0;i<parameterTypes.length;i++) {
                     if(i==parameterTypes.length-1){
+                        //简写的名字String parameterTypes[i].getSimpleName();
                         System.out.print(parameterTypes[i].getName()+" args_"+i);
                         break;
                     }

@@ -127,5 +127,6 @@ public class ReflectionTest {
         //3.调用此构造器创建运行时类的对象，需要传递参数
         Person person = (Person) constructor.newInstance();
         System.out.println(person);
+
     }
 }
