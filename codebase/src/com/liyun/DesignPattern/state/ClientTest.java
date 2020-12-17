@@ -1,24 +1,23 @@
 package com.liyun.DesignPattern.state;
 
 /**
- * ״̬ģʽ������
+ * 状态模式测试类
  * @author Administrator
  *
  */
 public class ClientTest {
 
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		// ��������󣬽�Ʒ��1����Ʒ
+		// 创建活动对象，奖品池有1个奖品
         RaffleActivity activity = new RaffleActivity(1);
 
-        // ����������300�ν�
+        // 我们连续抽三次奖
         for (int i = 0; i < 30; i++) {
-            System.out.println("--------��" + (i + 1) + "�γ齱----------");
-            // �μӳ齱����һ������۳�����
+            System.out.println("--------第" + (i + 1) + "次抽奖----------");
+            // 参加抽奖，第一步点击扣除积分
             activity.debuctMoney();
 
-            // �ڶ����齱
+            // 第二步抽奖·
             activity.raffle();
         }
 	}

@@ -1,43 +1,43 @@
 package com.liyun.DesignPattern.state;
 
 /**
- * �齱� //
+ * 抽奖活动
  * 
  * @author Administrator
  *
  */
 public class RaffleActivity {
 
-	// state ��ʾ���ǰ��״̬���Ǳ仯
+	// state 表示活动当前状态，是变化的
     State state = null;
-    // ��Ʒ����
+    // 奖品数量
     int count = 0;
     
-    // �ĸ����ԣ���ʾ����״̬
+    // 四个属性，表示四种状态
     State noRafflleState = new NoRaffleState(this);
     State canRaffleState = new CanRaffleState(this);
     
     State dispenseState =   new DispenseState(this);
     State dispensOutState = new DispenseOutState(this);
 
-    //������
-    //1. ��ʼ����ǰ��״̬Ϊ noRafflleState�������ܳ齱��״̬��
-    //2. ��ʼ����Ʒ������ 
+    //构造器
+    //1. 初始化当前状态为noRafflleState(即不能抽奖状态)
+    //2. 初始化奖品的数量
     public RaffleActivity( int count) {
         this.state = getNoRafflleState();
         this.count = count;
     }
 
-    //�۷�, ���õ�ǰ״̬�� deductMoney
+    //扣分，调用当前状态的deductMoney
     public void debuctMoney(){
         state.deductMoney();
     }
 
-    //�齱 
+    //抽奖
     public void raffle(){
-    	// �����ǰ��״̬�ǳ齱�ɹ�
+    	// 如果当前状态是抽奖成功
         if(state.raffle()){
-        	//��ȡ��Ʒ
+        	//领取奖品
             state.dispensePrize();
         }
 
@@ -51,7 +51,7 @@ public class RaffleActivity {
         this.state = state;
     }
 
-    //��������ע�⣬ÿ��ȡһ�ν�Ʒ��count--
+    //这里请注意，每领取一次奖品，count--
     public int getCount() {
     	int curCount = count; 
     	count--;

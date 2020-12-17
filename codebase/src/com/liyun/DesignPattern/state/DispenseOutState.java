@@ -1,14 +1,14 @@
 package com.liyun.DesignPattern.state;
 
 /**
- * ��Ʒ�������״̬
- * ˵����������activity �ı�� DispenseOutState�� �齱�����
+ *  奖品发放完毕状态
+ *  说明，当我们的activity 改变成DispenseOutState，即所有的抽奖活动结束
  * @author Administrator
  *
  */
 public class DispenseOutState extends State {
 
-	// ��ʼ��ʱ��������
+	//初始化时传入活动引用
     RaffleActivity activity;
 
     public DispenseOutState(RaffleActivity activity) {
@@ -16,17 +16,17 @@ public class DispenseOutState extends State {
     }
     @Override
     public void deductMoney() {
-        System.out.println("��Ʒ�������ˣ����´��ٲμ�");
+        System.out.println("奖品发送完了，请下次再参加");
     }
 
     @Override
     public boolean raffle() {
-        System.out.println("��Ʒ�������ˣ����´��ٲμ�");
+        System.out.println("奖品发送完了，请下次再参加");
         return false;
     }
 
     @Override
     public void dispensePrize() {
-        System.out.println("��Ʒ�������ˣ����´��ٲμ�");
+        System.out.println("奖品发送完了，请下次再参加");
     }
 }

@@ -1,36 +1,36 @@
 package com.liyun.DesignPattern.state;
 
 /**
- * ���ܳ齱״̬
+ * 不能抽奖的状态
  * @author Administrator
  *
  */
 public class NoRaffleState extends State {
 
-	 // ��ʼ��ʱ�������ã��۳����ֺ�ı���״̬
+	 // 初始化时传入活动引用，扣除积分后改变其状态
     RaffleActivity activity;
 
     public NoRaffleState(RaffleActivity activity) {
         this.activity = activity;
     }
 
-    // ��ǰ״̬���Կۻ��� , �۳��󣬽�״̬���óɿ��Գ齱״̬
+    //当前状态可以扣积分，扣除后将状态设置成可以抽奖的状态
     @Override
     public void deductMoney() {
-        System.out.println("�۳�50���ֳɹ��������Գ齱��");
+        System.out.println("扣除50积分成功，您可以抽奖了");
         activity.setState(activity.getCanRaffleState());
     }
 
-    // ��ǰ״̬���ܳ齱
+    // 当前状态不能抽奖
     @Override
     public boolean raffle() {
-        System.out.println("���˻��ֲ��ܳ齱ร�");
+        System.out.println("扣了积分才能抽奖！！");
         return false;
     }
 
-    // ��ǰ״̬���ܷ���Ʒ
+    // 当前状态不能发奖品
     @Override
     public void dispensePrize() {
-        System.out.println("���ܷ��Ž�Ʒ");
+        System.out.println("不能发放奖品");
     }
 }
