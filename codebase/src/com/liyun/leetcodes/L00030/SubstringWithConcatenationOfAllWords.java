@@ -24,7 +24,9 @@ public class SubstringWithConcatenationOfAllWords {
     public List<Integer> findSubstring(String s, String[] words) {
         List<Integer> result = new ArrayList<>();
         //每次滑动的长度
-        int wordLenth = words[0].length();
+        int wordLength = words[0].length();
+        //单词的个数
+        int sumLength = words.length;
         if(words.length==0 || StringUtils.isBlank(s)){
             return result;
         }
@@ -38,6 +40,13 @@ public class SubstringWithConcatenationOfAllWords {
            }
         }
 
+        int cur = 0;
+        while(cur<s.length()){
+         for(int i=0;i<sumLength;i++){
+             //当前需要检查的单词
+             String nowStr = s.substring(cur+i,wordLength);
+         }
+        }
 
 
 
