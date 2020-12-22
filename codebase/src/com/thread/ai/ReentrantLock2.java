@@ -30,7 +30,7 @@ public class ReentrantLock2 implements Lock, java.io.Serializable {
          * Performs non-fair tryLock.  tryAcquire is implemented in
          * subclasses, but both need nonfair try for trylock method.
          */
-        //非公平
+        //非公平，
         final boolean nonfairTryAcquire(int acquires) {
             final Thread current = Thread.currentThread();
             int c = getState();
@@ -147,7 +147,7 @@ public class ReentrantLock2 implements Lock, java.io.Serializable {
             int c = getState();
             //如果状态是0
             if (c == 0) {
-                //hasQueuedPredecessors 之前是否还有节点
+                //hasQueuedPredecessors 之前是否还有节点 ！！！hasQueuedPredecessors()是实现公平和非公平锁的关键，如果有前驱节点，就不执行请求锁的compareAndSetState方法！！！！！
                 if (!hasQueuedPredecessors() &&
                         compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);

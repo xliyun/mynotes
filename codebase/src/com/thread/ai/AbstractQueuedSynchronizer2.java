@@ -362,6 +362,7 @@ public abstract class AbstractQueuedSynchronizer2
      *
      * @param node the node
      */
+    //把当前节点赋值给头结点，addWaiter的时候node有赋值过前节点，这里置空等待回收
     private void setHead(Node node) {
         head = node;
         node.thread = null;
@@ -622,9 +623,9 @@ public abstract class AbstractQueuedSynchronizer2
                 //如果前一个节点是头节点(也就是当前节点是第一个节点，AQS链表是一个空的head指向头结点)，并且当前节点tryAcquire获取源锁成功
                 //第三次获取AQS锁
                 if (p == head && tryAcquire(arg)) {
-                    //当前节点tryAcquire获取到锁了就把他设置为头结点             ,并且线程Thread设置为空，因为已经获取到线程锁了，
+                    //当前节点tryAcquire获取到锁了就把他赋值给头结点，把没有用了的node置空，以便JVM回收，
                     setHead(node);
-                    p.next = null; // help GC 释放掉前一个头结点
+                    p.next = null; // help GC 释放掉前一个头结点，置空上一任头结点，以便JVM回收
                     failed = false;
                     return interrupted;
                 }
