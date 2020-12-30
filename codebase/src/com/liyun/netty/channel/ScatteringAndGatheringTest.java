@@ -25,7 +25,7 @@ public class ScatteringAndGatheringTest {
         byteBuffers[0] = ByteBuffer.allocate(5);
         byteBuffers[1] = ByteBuffer.allocate(3);
 
-        //等待客户端连接(telnet)
+        //等待客户端连接(telnet) telnet ctrl+] send 信息
         SocketChannel socketChannel = serverSocketChannel.accept();
         int messageLength = 8; //假定从客户端接收八个字节
         //循环的读取

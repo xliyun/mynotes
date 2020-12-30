@@ -38,7 +38,7 @@ public class BIOServer {
                 newCachedThreadPool.execute(new Runnable() {
                     @Override
                     public void run() {
-                        //可以和客户端通讯
+                        //可以和客户端通讯 telnet ctrl+] send 信息
                         handler(socket);
                     }
                 });

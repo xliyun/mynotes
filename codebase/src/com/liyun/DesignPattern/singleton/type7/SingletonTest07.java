@@ -1,7 +1,7 @@
 package com.liyun.DesignPattern.singleton.type7;
 
 
-import com.thread.ta4.Single;
+
 
 /**
  * @description:
