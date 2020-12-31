@@ -37,7 +37,9 @@ public class BasicBuffer {
         intBuffer.position(1);//从下标1开始
         intBuffer.limit(3);//不能超过3
 
+        //如果还有剩余的，就继续读
          while(intBuffer.hasRemaining()){
+             //每get一次，索引向后移动一次
              System.out.println(intBuffer.get());
          }
     }
