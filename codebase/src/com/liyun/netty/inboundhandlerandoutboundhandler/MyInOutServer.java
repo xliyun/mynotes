@@ -17,7 +17,7 @@ public class MyInOutServer {
             ServerBootstrap serverBootstrap = new ServerBootstrap();
             serverBootstrap.group(bossGroup,workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .childHandler(null);
+                    .childHandler(new MyServerInitializer());
 
             ChannelFuture channelFuture = serverBootstrap.bind(7000).sync();
             channelFuture.channel().closeFuture().sync();
