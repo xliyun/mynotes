@@ -458,6 +458,10 @@ https://blog.csdn.net/yangyutong0506/article/details/46880773
 
 ### 单机多实例部署
 
+## 缓存淘汰策略
+
+maxmemory配置指令
+
 
 
 # AOF保存
