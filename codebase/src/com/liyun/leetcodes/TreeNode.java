@@ -5,9 +5,9 @@ package com.liyun.leetcodes;
  * @author: xiaoliyu
  * @date: 2019-11-12 16:21
  */
-class TreeNode {
-    int val;
-    TreeNode left;
-    TreeNode right;
-    TreeNode(int x) { val = x; }
+public class TreeNode {
+    public int val;
+    public TreeNode left;
+    public TreeNode right;
+    public TreeNode(int x) { val = x; }
 }
