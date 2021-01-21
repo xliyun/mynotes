@@ -14,13 +14,19 @@ import java.util.*;
 public class BinaryTreeZigzagLevelOrderTraversal {
     /**
      * [1,2,3,4,null,null,5]
+     * [0,2,4,1,null,3,-1,5,1,null,6,null,8]
      */
     public static void main(String[] args) {
-        TreeNode root = new TreeNode(3);
-        root.left = new TreeNode(9);
-        root.right = new TreeNode(20);
-        root.right.left = new TreeNode(15);
-        root.right.right = new TreeNode(7);
+//        TreeNode root = new TreeNode(3);
+//        root.left = new TreeNode(9);
+//        root.right = new TreeNode(20);
+//        root.right.left = new TreeNode(15);
+//        root.right.right = new TreeNode(7);
+        TreeNode root = new TreeNode(1);
+        root.left = new TreeNode(2);
+        root.right = new TreeNode(3);
+        root.left.left = new TreeNode(4);
+        root.right.right = new TreeNode(5);
 
         BinaryTreeZigzagLevelOrderTraversal binaryTreeZigzagLevelOrderTraversal = new BinaryTreeZigzagLevelOrderTraversal();
         List<List<Integer>> lists = binaryTreeZigzagLevelOrderTraversal.zigzagLevelOrder(root);
@@ -75,7 +81,8 @@ public class BinaryTreeZigzagLevelOrderTraversal {
 
         if(treeNodeList.size()>0){
             result.add(arr);
-
+            if(!odd)
+            Collections.reverse(treeNodeList);
             levelTraversal(result,treeNodeList,!odd);
         }
     }
