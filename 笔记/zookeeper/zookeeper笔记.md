@@ -285,7 +285,7 @@ ls2 /hadoop              # 可以查看结点的列表以及目标结点的信�
 ls /                     # 根节点
 ```
 
-**监听器get path [watch] | stat path [watch]** 
+**监听器get path [watch] | stat path [watch]** （已经变成 get -w path了）
 
 使用`get path [watch]` 注册的监听器能够在结点**内容发生改变**的时候，向客户端发出通知。需要注意的是`zookeeper`的触发器是一次性的(`One-time trigger`)，即触发一次后就会立即失效
 
@@ -1051,7 +1051,7 @@ public static void main(String[] args) throws IOException, InterruptedException 
 
 **exists**
 
-- `exists(String path, boolean b)`
+- `exists(String path, boolean b)` boolean b表示是否用new ZooKeeper(IP, 5000,new wathch);的第三个参数watch对象作为事件监听	
 
 - `exists(String path, Watcher w)`
 
@@ -1137,17 +1137,31 @@ public static void main(String[] args) throws IOException, InterruptedException 
 
 **getData**
 
-- `getData(String path, boolean b, Stat stat)`
-- `getData(String path, Watcher w, Stat stat)`
-- `NodeDeleted`：**节点**删除
-- `NodeDataChange`：**节点**内容发生变化
+```java
+// 使用连接对象new ZooKeeper(IP, 6000, new Watcher(){})的监视器
+getData(String path, boolean b, Stat stat)
+// 自定义监视器  
+getData(String path, Watcher w, Stat stat)
+//NodeDeleted：节点删除
+//NodeDataChange：节点内容发生变化
+```
 
-**getChildren**
+**getChildren**查看子节点
 
-- `getChildren(String path, boolean b)`
-- `getChildren(String path, Watcher w)`
-- `NodeChildrenChanged`：**子节点**发生变化
-- `NodeDeleted`：**节点删除**
+```java
+//使用连接对象的监视器
+getChildren(String path, boolean b)
+//自定义监视器
+getChildren(String path, Watcher w)
+//NodeChildrenChanged：子节点发生变化
+//NodeDeleted：节点删除
+```
+
+- **path**- zonde路径
+
+- **b**- 是否使用连接对象中注册的监视器
+
+- **w**-监视器对象
 
 **配置中心案例**
 
