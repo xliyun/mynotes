@@ -13,7 +13,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class ZKGet {
 
-    String IP = "192.168.60.130:2181";
+    String IP = "192.168.211.132:2181";
     ZooKeeper zooKeeper;
 
     @Before

@@ -19,7 +19,7 @@ public class HEAP_SORT {
     public static void sort(int[] arr){
         //1.构建大顶堆
         for(int i=arr.length/2-1;i>=0;i--){
-            //从第一个非叶子结点从下至上，从右至左调整结构(交换最大值到大顶堆，然后调整子节点)
+            //！！！！！！从第一个非叶子结点从下至上，从右至左调整结构(交换最大值到大顶堆，然后调整子节点)
             adjustHeap(arr,i,arr.length);
         }
         //2.调整堆结构+交换堆顶元素与末尾元素
