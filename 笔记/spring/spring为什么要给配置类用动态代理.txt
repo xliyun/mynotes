@@ -1,0 +1,2 @@
+spring为什么要给配置类用上动态代理
+https://blog.csdn.net/qq_41907991/article/details/106008651?utm_medium=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.edu_weight&depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromMachineLearnPai2-2.edu_weight
